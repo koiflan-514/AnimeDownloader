@@ -8,7 +8,7 @@ AnimeDownloader 是一个参考 CatgirlDownloader（GTK4/Python）功能、使�
 
 ```
 AnimeDownloader/
-├── AnimeDownloader.sln
+├── AnimeDownloader.slnx          # .NET 10 解决方案（新 XML 格式）
 ├── Directory.Build.props          # 公共编译属性（Nullable、警告即错误、确定性构建）
 ├── src/
 │   ├── AnimeDownloader.Core/      # 纯 .NET 类库：不依赖 WinUI，可独立单元测试
@@ -33,13 +33,13 @@ AnimeDownloader/
 | 组件 | 职责 |
 | --- | --- |
 | `Models/NsfwMode` | NSFW 三态：`ShowEverything` / `OnlyNsfw` / `BlockNsfw`（对应参考项目的 NSFWOption） |
-| `Models/ImageItem` | 单个图片条目：URL、艺术家、来源链接、建议文件名、扩展名、原始元数据 |
+| `Models/ImageItem` | 单个图片条目：URL、缩略图 URL、艺术家、来源链接、建议文件名、扩展名、原始元数据 |
 | `Sources/IImageSource` | 图源抽象：随机单图、批量取图、分页取图、`SupportsPaging` 标志、文件名建议 |
-| `Sources/*` | 7 个图源适配器：NekosMoe、WaifuIm、Danbooru、Lolicon、Dmoe、Safebooru、YandeRe |
+| `Sources/*` | 7 个图源适配器：NekosMoe、WaifuIm、Danbooru、Lolicon、Dmoe、Safebooru、YandeRe（Danbooru 等填充缩略图 URL 供画廊快速加载） |
 | `Services/SettingsStore` | JSON 配置持久化，键名与默认值与参考项目保持一致 |
 | `Services/ProxyDetector` | 环境变量 + Windows 注册表 Internet Settings 的系统代理检测 |
-| `Services/HttpClientFactory` | 共享 HttpClient/Handler 工厂，注入检测到的代理，统一 UA 与超时 |
-| `Services/ImageDownloader` | 流式下载图片字节，支持取消与进度回调 |
+| `Services/HttpClientFactory` | 共享 HttpClient/Handler 工厂，注入检测到的代理，统一 UA 与超时（20s） |
+| `Services/ImageDownloader` | 流式下载图片字节，支持取消、进度回调与 200MB 大小上限 |
 
 ### App（src/AnimeDownloader.App）
 
