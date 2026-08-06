@@ -36,3 +36,9 @@ Desktop.ini
 
 # Reasonix
 .reasonix/
+
+# 安装包构建产物
+publish/
+tools/installer/bin/
+tools/installer/obj/
+tools/installer/*.wixpdb

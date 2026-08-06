@@ -1,0 +1,14 @@
+<Project Sdk="WixToolset.Sdk/7.0.0">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <OutputName>AnimeDownloader-$(Version)-$(DeployType)-$(ArchShort)</OutputName>
+    <InstallerPlatform>$(Platform)</InstallerPlatform>
+    <DefineConstants>PublishDir=$(PublishDir);Version=$(Version)</DefineConstants>
+    <SuppressValidation>true</SuppressValidation>
+    <!-- 避免 WiX 7 不识别 embedded pdbType 的警告 -->
+    <PdbType>none</PdbType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="7.0.0" />
+  </ItemGroup>
+</Project>
