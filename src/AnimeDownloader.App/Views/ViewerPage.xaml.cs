@@ -10,12 +10,11 @@ namespace AnimeDownloader.App.Views;
 
 /// <summary>
 /// 查看器页：显示当前图源的随机大图，支持换一张 / 保存 / 全屏。
-/// 对应参考项目的 viewer 模式。
+/// 图源与 NSFW 过滤来自主窗口全局工具栏，切换源后立即重载。
 /// </summary>
-public sealed partial class ViewerPage : Page
+public sealed partial class ViewerPage : Page, IModePage
 {
     private MainWindow? _owner;
-    private IReadOnlyList<IImageSource> _sources = Array.Empty<IImageSource>();
     private SettingsStore _settingsStore = null!;
     private ImageDownloader _downloader = null!;
     private IImageSource _currentSource = null!;
@@ -29,37 +28,45 @@ public sealed partial class ViewerPage : Page
         InitializeComponent();
     }
 
-    protected override void OnNavigatedTo(NavigationEventArgs e)
+    // ---------------- IModePage ----------------
+
+    public void Attach(MainWindow owner)
     {
-        base.OnNavigatedTo(e);
-        if (e.Parameter is not MainWindow owner)
+        var firstAttach = _owner is null;
+        _owner = owner;
+        _settingsStore = owner.SettingsStore;
+        _downloader = owner.Downloader;
+        _currentSource = owner.CurrentSource;
+        _nsfwMode = owner.CurrentNsfwMode;
+        if (firstAttach)
+        {
+            _ = LoadRandomAsync();
+        }
+    }
+
+    public void OnSourceChanged()
+    {
+        if (_owner is null)
         {
             return;
         }
 
-        _owner = owner;
-        _sources = owner.Sources;
-        _settingsStore = owner.SettingsStore;
-        _downloader = owner.Downloader;
-        _currentSource = FindSource(_settingsStore.Load().SelectedSource);
-        _nsfwMode = _settingsStore.Load().NsfwMode.ToCore();
+        _currentSource = _owner.CurrentSource;
         _ = LoadRandomAsync();
     }
 
-    private IImageSource FindSource(string? id)
+    public void OnNsfwChanged()
     {
-        for (var i = 0; i < _sources.Count; i++)
+        if (_owner is null)
         {
-            if (_sources[i].Id == id)
-            {
-                return _sources[i];
-            }
+            return;
         }
 
-        return _sources.Count > 0
-            ? _sources[0]
-            : throw new InvalidOperationException("没有可用图源");
+        _nsfwMode = _owner.CurrentNsfwMode;
+        _ = LoadRandomAsync();
     }
+
+    public void Reload() => _ = LoadRandomAsync();
 
     private async Task LoadRandomAsync()
     {
@@ -78,7 +85,7 @@ public sealed partial class ViewerPage : Page
 
             if (item is null)
             {
-                ErrorText.Text = "没有获取到图片";
+                ErrorText.Text = "没有获取到图片。可尝试更换图源或 NSFW 模式。";
                 ErrorPanel.Visibility = Visibility.Visible;
                 StatusText.Text = "加载失败";
                 return;
@@ -123,6 +130,8 @@ public sealed partial class ViewerPage : Page
     }
 
     private void OnRefresh(object sender, RoutedEventArgs e) => _ = LoadRandomAsync();
+
+    private void OnRetry(object sender, RoutedEventArgs e) => _ = LoadRandomAsync();
 
     private void OnToggleFullscreen(object sender, RoutedEventArgs e)
     {

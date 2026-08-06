@@ -5,7 +5,63 @@
     Title="AnimeDownloader">
 
     <Grid x:Name="Root">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 全局工具栏：两种模式（查看器/画廊）共享的图源、NSFW 过滤与刷新 -->
+        <Grid Grid.Row="0" Padding="16,10,16,6" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="图源" VerticalAlignment="Center"
+                           Style="{StaticResource CaptionTextBlockStyle}"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <ComboBox
+                    x:Name="SourceCombo"
+                    MinWidth="240"
+                    MaxDropDownHeight="360"
+                    SelectionChanged="OnSourceSelectionChanged">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Padding="0,4" Spacing="2">
+                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding Description}" FontSize="11"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="NSFW" VerticalAlignment="Center"
+                           Style="{StaticResource CaptionTextBlockStyle}"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <ComboBox x:Name="NsfwCombo" MinWidth="130" SelectionChanged="OnNsfwSelectionChanged">
+                    <ComboBoxItem Content="屏蔽 NSFW" Tag="BlockNsfw" />
+                    <ComboBoxItem Content="仅 NSFW" Tag="OnlyNsfw" />
+                    <ComboBoxItem Content="全部显示" Tag="ShowEverything" />
+                </ComboBox>
+            </StackPanel>
+
+            <Button Grid.Column="2" x:Name="GlobalRefreshButton" Content="刷新"
+                    VerticalAlignment="Center" Click="OnGlobalRefresh" />
+
+            <TextBlock Grid.Column="3" x:Name="GlobalStatusText"
+                       Text="就绪" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Grid>
+
         <NavigationView
+            Grid.Row="1"
             x:Name="RootNav"
             PaneDisplayMode="Top"
             IsBackButtonVisible="Collapsed"

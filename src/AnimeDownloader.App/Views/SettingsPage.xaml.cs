@@ -2,7 +2,6 @@ using AnimeDownloader.Core.Services;
 using AnimeDownloader.Core.Sources;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Navigation;
 
 namespace AnimeDownloader.App.Views;
 
@@ -10,7 +9,7 @@ namespace AnimeDownloader.App.Views;
 /// 设置页：NSFW 过滤、主题、自动刷新间隔、画廊数量、代理与各图源标签。
 /// 保存后调用主窗口的 ApplySettings 让变更立即生效。
 /// </summary>
-public sealed partial class SettingsPage : Page
+public sealed partial class SettingsPage : Page, IModePage
 {
     private MainWindow? _owner;
     private SettingsStore? _store;
@@ -23,17 +22,14 @@ public sealed partial class SettingsPage : Page
         InitializeComponent();
     }
 
-    protected override void OnNavigatedTo(NavigationEventArgs e)
-    {
-        base.OnNavigatedTo(e);
-        if (e.Parameter is not MainWindow owner)
-        {
-            return;
-        }
+    // ---------------- IModePage ----------------
 
+    /// <summary>绑定主窗口共享状态并刷新控件（替代原 OnNavigatedTo）。</summary>
+    public void Attach(MainWindow owner)
+    {
         _owner = owner;
         _store = owner.SettingsStore;
-        _settings = _store.Load();
+        _settings = owner.Settings;
         _sources = owner.Sources;
 
         // 通用
@@ -79,6 +75,21 @@ public sealed partial class SettingsPage : Page
         }
     }
 
+    /// <summary>设置页不参与浏览模式的重载。</summary>
+    public void OnSourceChanged()
+    {
+    }
+
+    /// <summary>设置页不参与浏览模式的重载。</summary>
+    public void OnNsfwChanged()
+    {
+    }
+
+    /// <summary>刷新按钮在设置页时无操作（安全）。</summary>
+    public void Reload()
+    {
+    }
+
     private void OnSave(object sender, RoutedEventArgs e)
     {
         if (_settings is null || _store is null || _owner is null)
@@ -106,6 +117,8 @@ public sealed partial class SettingsPage : Page
 
         _store.Save(_settings);
         _owner.ApplySettings();
+        // ApplySettings 重新 Load 出新实例：跟进共享引用，避免后续用旧实例覆盖
+        _settings = _owner.Settings;
         StatusText.Text = "设置已保存";
     }
 
@@ -121,6 +134,7 @@ public sealed partial class SettingsPage : Page
         _store.Save(fresh);
         _settings = fresh;
         _owner.ApplySettings();
+        _settings = _owner.Settings;
         ReloadControls();
         StatusText.Text = "已恢复默认设置";
     }

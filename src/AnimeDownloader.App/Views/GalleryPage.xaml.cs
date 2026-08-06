@@ -10,9 +10,9 @@ namespace AnimeDownloader.App.Views;
 
 /// <summary>
 /// 画廊页：随机 / 分页两种模式展示缩略图网格，支持自动刷新与点击打开全屏查看器。
-/// 对应参考项目的 gallery 视图。
+/// 图源与 NSFW 过滤由主窗口全局工具栏提供（对应参考项目窗口级 source_selector）。
 /// </summary>
-public sealed partial class GalleryPage : Page
+public sealed partial class GalleryPage : Page, IModePage
 {
     private MainWindow? _owner;
     private IReadOnlyList<IImageSource> _sources = Array.Empty<IImageSource>();
@@ -22,6 +22,7 @@ public sealed partial class GalleryPage : Page
     private IImageSource _currentSource = null!;
     private NsfwMode _nsfwMode = NsfwMode.BlockNsfw;
     private bool _pagedMode;
+    private bool _restoringState;
     private int _page = 1;
     private bool _isLoading;
     private bool _pendingReload;
@@ -29,92 +30,91 @@ public sealed partial class GalleryPage : Page
     private DispatcherTimer? _autoReloadTimer;
     private int _galleryCount;
     private IReadOnlyList<ImageItem> _items = Array.Empty<ImageItem>();
-    private readonly List<ImageCard> _cards = new();
 
     public GalleryPage()
     {
         InitializeComponent();
+        Loaded += (_, _) => OnPageLoaded();
+        Unloaded += (_, _) => OnPageUnloaded();
     }
 
-    protected override void OnNavigatedTo(NavigationEventArgs e)
+    /// <summary>页面回到可视树：恢复自动刷新（若已启用）。</summary>
+    private void OnPageLoaded()
     {
-        base.OnNavigatedTo(e);
-        if (e.Parameter is not MainWindow owner)
+        if (_owner is not null && AutoReloadSwitch.IsOn && !_isLoading)
         {
-            return;
+            StartAutoReload();
         }
+    }
 
+    /// <summary>页面离开可视树：暂停自动刷新，避免后台空转。</summary>
+    private void OnPageUnloaded()
+    {
+        StopAutoReload();
+    }
+
+    // ---------------- IModePage ----------------
+
+    public void Attach(MainWindow owner)
+    {
+        var firstAttach = _owner is null;
         _owner = owner;
         _sources = owner.Sources;
         _settingsStore = owner.SettingsStore;
-        _settings = owner.SettingsStore.Load();
+        _settings = owner.Settings;
+        _currentSource = owner.CurrentSource;
+        _nsfwMode = owner.CurrentNsfwMode;
 
-        PopulateSourceCombo();
         RestoreState();
-        if (_items.Count == 0)
+        UpdateModeControls();
+        if (firstAttach && _items.Count == 0)
         {
             _ = RequestReload();
         }
     }
 
-    protected override void OnNavigatedFrom(NavigationEventArgs e)
+    public void OnSourceChanged()
     {
-        base.OnNavigatedFrom(e);
-        StopAutoReload();
+        if (_owner is null)
+        {
+            return;
+        }
+
+        _currentSource = _owner.CurrentSource;
+        _page = 1;
+        UpdateModeControls();
+        _ = RequestReload();
     }
 
-    private void PopulateSourceCombo()
+    public void OnNsfwChanged()
     {
-        SourceCombo.Items.Clear();
-        foreach (var source in _sources)
+        if (_owner is null)
         {
-            SourceCombo.Items.Add(source);
+            return;
         }
+
+        _nsfwMode = _owner.CurrentNsfwMode;
+        _ = RequestReload();
     }
+
+    public void Reload() => _ = RequestReload();
+
+    // ---------------- 状态恢复 ----------------
 
     private void RestoreState()
     {
-        // 恢复保存的设置
-        var savedSource = _settings.SelectedSource;
-        for (var i = 0; i < SourceCombo.Items.Count; i++)
+        // 子模式：random / paged（来自持久化设置）；抑制控件事件避免重复加载
+        _restoringState = true;
+        try
         {
-            if (SourceCombo.Items[i] is IImageSource s && s.Id == savedSource)
-            {
-                SourceCombo.SelectedIndex = i;
-                break;
-            }
+            _pagedMode = _settings.GallerySubmode == "paged";
+            ModeToggle.IsChecked = _pagedMode;
+            _galleryCount = _settings.GalleryCount > 0 ? _settings.GalleryCount : 12;
+            AutoReloadSwitch.IsOn = _settings.AutoReloadEnabled;
         }
-
-        if (SourceCombo.SelectedIndex < 0 && SourceCombo.Items.Count > 0)
+        finally
         {
-            SourceCombo.SelectedIndex = 0;
-        }
-
-        _currentSource = (IImageSource)SourceCombo.SelectedItem;
-
-        // NSFW 模式
-        _nsfwMode = _settings.NsfwMode.ToCore();
-        for (var i = 0; i < NsfwCombo.Items.Count; i++)
-        {
-            if (NsfwCombo.Items[i] is ComboBoxItem item &&
-                item.Tag?.ToString() == _nsfwMode.ToString())
-            {
-                NsfwCombo.SelectedIndex = i;
-                break;
-            }
-        }
-
-        // 子模式：random / paged
-        _pagedMode = _settings.GallerySubmode == "paged";
-        ModeToggle.IsChecked = _pagedMode;
-        UpdateModeControls();
-
-        _galleryCount = _settings.GalleryCount > 0 ? _settings.GalleryCount : 12;
-
-        AutoReloadSwitch.IsOn = _settings.AutoReloadEnabled;
-        if (_settings.AutoReloadEnabled)
-        {
-            StartAutoReload();
+            _restoringState = false;
         }
     }
 
@@ -130,37 +130,13 @@ public sealed partial class GalleryPage : Page
         PageLabel.Text = $"第 {_page} 页";
     }
 
-    private void OnSourceChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (SourceCombo.SelectedItem is not IImageSource source)
-        {
-            return;
-        }
-
-        _currentSource = source;
-        _settings.SelectedSource = source.Id;
-        _settingsStore.Save(_settings);
-        _page = 1;
-        UpdateModeControls();
-        _ = RequestReload();
-    }
-
-    private void OnNsfwChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (NsfwCombo.SelectedItem is not ComboBoxItem item ||
-            !Enum.TryParse<NsfwMode>(item.Tag?.ToString(), out var mode))
-        {
-            return;
-        }
-
-        _nsfwMode = mode;
-        _settings.NsfwMode = mode.ToStorage();
-        _settingsStore.Save(_settings);
-        _ = RequestReload();
-    }
-
     private void OnModeToggleChecked(object sender, RoutedEventArgs e)
     {
+        if (_restoringState)
+        {
+            return;
+        }
+
         _pagedMode = true;
         _settings.GallerySubmode = "paged";
         _settingsStore.Save(_settings);
@@ -171,6 +147,11 @@ public sealed partial class GalleryPage : Page
 
     private void OnModeToggleUnchecked(object sender, RoutedEventArgs e)
     {
+        if (_restoringState)
+        {
+            return;
+        }
+
         _pagedMode = false;
         _settings.GallerySubmode = "random";
         _settingsStore.Save(_settings);
@@ -195,7 +176,7 @@ public sealed partial class GalleryPage : Page
         _ = RequestReload();
     }
 
-    private void OnRefresh(object sender, RoutedEventArgs e) => _ = RequestReload();
+    private void OnRetry(object sender, RoutedEventArgs e) => _ = RequestReload();
 
     /// <summary>请求一次重载：递增代际 token 使在途请求的结果作废，避免竞态。</summary>
     private Task RequestReload()
@@ -206,6 +187,11 @@ public sealed partial class GalleryPage : Page
 
     private void OnAutoReloadToggled(object sender, RoutedEventArgs e)
     {
+        if (_restoringState)
+        {
+            return;
+        }
+
         _settings.AutoReloadEnabled = AutoReloadSwitch.IsOn;
         _settingsStore.Save(_settings);
         if (AutoReloadSwitch.IsOn)
@@ -248,6 +234,7 @@ public sealed partial class GalleryPage : Page
         var token = ++_reloadToken;
         StopAutoReload();
         LoadingRing.IsActive = true;
+        RetryButton.Visibility = Visibility.Collapsed;
         StatusText.Text = "加载中…";
         try
         {
@@ -269,9 +256,15 @@ public sealed partial class GalleryPage : Page
 
             _items = items;
             PopulateGrid();
-            StatusText.Text = items.Count == 0
-                ? "没有找到图片。请尝试更换标签或 NSFW 模式。"
-                : $"共 {items.Count} 张图片";
+            if (items.Count == 0)
+            {
+                StatusText.Text = "没有找到图片。可尝试更换图源、切换 NSFW 模式或调整图源标签。";
+                RetryButton.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                StatusText.Text = $"{_currentSource.DisplayName} · 共 {items.Count} 张图片";
+            }
         }
         catch (Exception ex)
         {
@@ -281,6 +274,7 @@ public sealed partial class GalleryPage : Page
             }
 
             StatusText.Text = $"加载失败：{ex.Message}";
+            RetryButton.Visibility = Visibility.Visible;
         }
         finally
         {
@@ -291,7 +285,7 @@ public sealed partial class GalleryPage : Page
                 _pendingReload = false;
                 _ = RequestReload();
             }
-            else if (AutoReloadSwitch.IsOn)
+            else if (AutoReloadSwitch.IsOn && IsLoaded)
             {
                 StartAutoReload();
             }
@@ -301,11 +295,8 @@ public sealed partial class GalleryPage : Page
     private void PopulateGrid()
     {
         ThumbGrid.Items.Clear();
-        _cards.Clear();
         foreach (var item in _items)
         {
-            var card = new ImageCard { Item = item };
-            _cards.Add(card);
             ThumbGrid.Items.Add(item);
         }
     }
