@@ -7,6 +7,7 @@
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <RootNamespace>AnimeDownloader.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\icons\AnimeDownloader.ico</ApplicationIcon>
     <Platforms>x64;x86;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64</RuntimeIdentifiers>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -30,6 +31,11 @@
   <ItemGroup>
     <None Remove="Assets\**" />
     <Content Include="Assets\**" />
+  </ItemGroup>
+
+  <!-- 应用图标：嵌入 exe（ApplicationIcon）并复制到输出目录供窗口图标使用 -->
+  <ItemGroup>
+    <Content Include="..\icons\AnimeDownloader.ico" Link="AnimeDownloader.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

@@ -39,7 +39,28 @@ public sealed partial class MainWindow : Window
         Root.RequestedTheme = App.ResolveTheme(App.Settings.Theme);
         SyncToolbarFromSettings();
         ApplyWin11Chrome();
+        SetWindowIcon();
         Root.Loaded += (_, _) => ApplyWin11Chrome();
+    }
+
+    /// <summary>设置窗口（任务栏/标题栏）图标，与 exe 图标保持一致。</summary>
+    private void SetWindowIcon()
+    {
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "AnimeDownloader.ico");
+        if (!File.Exists(iconPath))
+        {
+            return;
+        }
+
+        try
+        {
+            // WinAppSDK 1.8：SetIcon(string) 接受 .ico 文件路径，运行时自行加载
+            AppWindow.SetIcon(iconPath);
+        }
+        catch (Exception)
+        {
+            // 图标设置失败不影响应用启动
+        }
     }
 
     /// <summary>
