@@ -4,15 +4,15 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:AnimeDownloader.App.Controls">
 
-    <Grid Padding="16,8,16,12" RowSpacing="8">
+    <Grid Padding="24,8,24,12" RowSpacing="8">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- 画廊工具栏：模式切换与分页 -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
+        <!-- 画廊工具栏：模式切换与分页（水平居中） -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
             <ToggleButton
                 x:Name="ModeToggle"
                 Content="随机模式"
@@ -32,14 +32,15 @@
                           Toggled="OnAutoReloadToggled" />
         </StackPanel>
 
-        <!-- 缩略图网格 -->
+        <!-- 缩略图网格（内容居中） -->
         <GridView
             x:Name="ThumbGrid"
             Grid.Row="1"
             SelectionMode="None"
             IsItemClickEnabled="True"
             ItemClick="OnThumbClick"
-            Padding="0,4,0,0">
+            Padding="0,4,0,0"
+            HorizontalAlignment="Center">
             <GridView.ItemsPanel>
                 <ItemsPanelTemplate>
                     <ItemsWrapGrid Orientation="Horizontal" ItemWidth="180" ItemHeight="180" />

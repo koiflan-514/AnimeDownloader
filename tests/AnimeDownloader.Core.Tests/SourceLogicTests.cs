@@ -174,13 +174,26 @@ public class SourceLogicTests
         using var http = CreateHttp(req =>
         {
             query = req.RequestUri!.Query;
-            return JsonResponse("""[{"id":7,"file_url":"https://safebooru.org/images/a.jpg"}]""");
+            return JsonResponse("""[{"id":7,"file_url":"https://safebooru.org/images/a.jpg","preview_url":"https://safebooru.org/thumbnails/7/t.jpg"}]""");
         });
         var source = new SafebooruSource(http);
 
-        await source.GetImagesPageAsync(NsfwMode.ShowEverything, page: 1, perPage: 12);
+        var items = await source.GetImagesPageAsync(NsfwMode.ShowEverything, page: 1, perPage: 12);
 
         Assert.Contains("pid=0", query);
+        Assert.Equal("https://safebooru.org/thumbnails/7/t.jpg", items[0].ThumbnailUrl);
+    }
+
+    [Fact]
+    public async Task Danbooru_ExposesThumbnailUrl()
+    {
+        using var http = CreateHttp(_ => JsonResponse(
+            """[{"id":9,"file_url":"https://d.example/a.jpg","preview_file_url":"https://d.example/prev/a.jpg"}]"""));
+        var source = new DanbooruSource(http);
+
+        var items = await source.GetImagesAsync(NsfwMode.ShowEverything, count: 1);
+
+        Assert.Equal("https://d.example/prev/a.jpg", items[0].ThumbnailUrl);
     }
 
     [Fact]

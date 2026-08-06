@@ -104,22 +104,17 @@ public sealed partial class GalleryViewerWindow : Window
 
     private void OnToggleFullscreen(object sender, RoutedEventArgs e)
     {
-        var presenter = AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
-        if (presenter is null)
+        if (AppWindow.Presenter is Microsoft.UI.Windowing.FullScreenPresenter)
         {
+            AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Overlapped);
+            FullscreenButton.Content = "全屏";
+            Toolbar.Visibility = Visibility.Visible;
             return;
         }
 
-        if (presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Maximized)
-        {
-            presenter.Restore();
-            FullscreenButton.Content = "全屏";
-        }
-        else
-        {
-            presenter.Maximize();
-            FullscreenButton.Content = "还原";
-        }
+        AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen);
+        FullscreenButton.Content = "退出全屏";
+        Toolbar.Visibility = Visibility.Collapsed;
     }
 
     private async void OnSave(object sender, RoutedEventArgs e)

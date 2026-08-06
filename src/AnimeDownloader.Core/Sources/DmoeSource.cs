@@ -48,11 +48,19 @@ public sealed class DmoeSource : ImageSourceBase
             return Array.Empty<ImageItem>();
         }
 
+        // dmoe 无批量接口，只能逐张拉取：并行发起请求以显著提升画廊加载速度。
+        var attempts = Math.Min(count * 2, 20);
+        var tasks = new List<Task<ImageItem?>>(attempts);
+        for (var i = 0; i < attempts; i++)
+        {
+            tasks.Add(GetRandomImageAsync(mode, cancellationToken));
+        }
+
+        var results = await Task.WhenAll(tasks).ConfigureAwait(false);
         var items = new List<ImageItem>(count);
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        for (var i = 0; i < count * 2 && items.Count < count; i++)
+        foreach (var item in results)
         {
-            var item = await GetRandomImageAsync(mode, cancellationToken).ConfigureAwait(false);
             if (item is null)
             {
                 continue;
@@ -61,6 +69,11 @@ public sealed class DmoeSource : ImageSourceBase
             if (seen.Add(item.Url))
             {
                 items.Add(item);
+            }
+
+            if (items.Count >= count)
+            {
+                break;
             }
         }
 

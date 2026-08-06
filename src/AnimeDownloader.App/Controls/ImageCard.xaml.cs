@@ -92,7 +92,9 @@ public sealed partial class ImageCard : UserControl
 
         try
         {
-            var bytes = await downloader.DownloadAsync(Item.Url);
+            // 画廊缩略图优先用图源缩略图地址（小得多），无缩略图时回退原图
+            var targetUrl = !string.IsNullOrEmpty(Item.ThumbnailUrl) ? Item.ThumbnailUrl : Item.Url;
+            var bytes = await downloader.DownloadAsync(targetUrl);
             if (token != _loadToken)
             {
                 return;

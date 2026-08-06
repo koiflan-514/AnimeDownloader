@@ -38,6 +38,46 @@ public sealed partial class MainWindow : Window
         Title = "AnimeDownloader";
         Root.RequestedTheme = App.ResolveTheme(App.Settings.Theme);
         SyncToolbarFromSettings();
+        ApplyWin11Chrome();
+        Root.Loaded += (_, _) => ApplyWin11Chrome();
+    }
+
+    /// <summary>
+    /// 应用 Win11 风格窗口外观：Mica 材质背景 + 主题自适应的标题栏按钮颜色。
+    /// Mica 需要 Win11 22000+，旧系统自动回退为普通背景。
+    /// </summary>
+    private void ApplyWin11Chrome()
+    {
+        // Mica 材质（Win11 半透明背景，标题栏不再纯白）
+        if (Microsoft.UI.Composition.SystemBackdrops.MicaController.IsSupported())
+        {
+            this.SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop();
+        }
+
+        // 标题栏按钮颜色跟随应用主题（避免系统默认的纯白/纯黑）
+        var isDark = ResolveIsDark();
+        var titleBar = AppWindow.TitleBar;
+        var fg = isDark ? Windows.UI.Color.FromArgb(255, 235, 235, 235) : Windows.UI.Color.FromArgb(255, 20, 20, 20);
+        var hover = isDark ? Windows.UI.Color.FromArgb(60, 255, 255, 255) : Windows.UI.Color.FromArgb(30, 0, 0, 0);
+        titleBar.ButtonForegroundColor = fg;
+        titleBar.ButtonHoverForegroundColor = fg;
+        titleBar.ButtonHoverBackgroundColor = hover;
+        titleBar.ButtonPressedForegroundColor = fg;
+        titleBar.ButtonPressedBackgroundColor = hover;
+        titleBar.ButtonInactiveForegroundColor = isDark ? Windows.UI.Color.FromArgb(140, 235, 235, 235) : Windows.UI.Color.FromArgb(140, 20, 20, 20);
+    }
+
+    /// <summary>按应用主题判断当前是否深色（Default 跟随系统，先按系统浅色处理，Loaded 后由 ActualTheme 校正）。</summary>
+    private bool ResolveIsDark()
+    {
+        var theme = App.ResolveTheme(App.Settings.Theme);
+        if (theme is ElementTheme.Light or ElementTheme.Dark)
+        {
+            return theme == ElementTheme.Dark;
+        }
+
+        // 跟随系统：以应用实际主题为准（窗口加载后可用）
+        return Root.ActualTheme == ElementTheme.Dark;
     }
 
     /// <summary>按当前设置重建 HttpClient、图源与下载器（代理/直连变更后调用）。</summary>
@@ -252,6 +292,7 @@ public sealed partial class MainWindow : Window
         App.Settings = _settings;
         RebuildHttp();
         Root.RequestedTheme = App.ResolveTheme(_settings.Theme);
+        ApplyWin11Chrome();
         SyncToolbarFromSettings();
         (_currentPage as IModePage)?.OnSourceChanged();
     }

@@ -3,7 +3,8 @@ namespace AnimeDownloader.Core.Models;
 /// <summary>
 /// 单个图片条目。承载展示、保存与来源追溯所需的全部信息。
 /// </summary>
-/// <param name="Url">可直接下载的图片地址。</param>
+/// <param name="Url">可直接下载的图片地址（原图）。</param>
+/// <param name="ThumbnailUrl">缩略图地址（可能为 null；画廊缩略图优先使用，加载更快）。</param>
 /// <param name="Artist">艺术家 / 作者（可能为 null）。</param>
 /// <param name="SourceLink">原帖 / 作品链接（可能为 null）。</param>
 /// <param name="Id">图源内的稳定标识（如 post id / pixiv pid），用于文件名建议。</param>
@@ -11,6 +12,7 @@ namespace AnimeDownloader.Core.Models;
 /// <param name="Metadata">图源返回的原始 JSON 元数据，供展示与扩展使用。</param>
 public sealed record ImageItem(
     string Url,
+    string? ThumbnailUrl = null,
     string? Artist = null,
     string? SourceLink = null,
     string? Id = null,

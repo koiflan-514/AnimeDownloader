@@ -11,7 +11,7 @@
         </Grid.RowDefinitions>
 
         <!-- 工具条 -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
+        <StackPanel x:Name="Toolbar" Grid.Row="0" Orientation="Horizontal" Spacing="8">
             <Button x:Name="RefreshButton" Content="换一张" Click="OnRefresh" />
             <Button x:Name="SaveButton" Content="保存" Click="OnSave" />
             <Button x:Name="FullscreenButton" Content="全屏" Click="OnToggleFullscreen" />
@@ -20,8 +20,8 @@
                        TextTrimming="CharacterEllipsis" MaxWidth="420" />
         </StackPanel>
 
-        <!-- 大图 -->
-        <Grid Grid.Row="1" Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}" CornerRadius="8">
+        <!-- 大图：默认完整显示（Uniform 等比缩放到可视区域） -->
+        <Grid x:Name="ViewArea" Grid.Row="1" Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}" CornerRadius="8">
             <Image x:Name="ViewImage" Stretch="Uniform" />
             <ProgressRing x:Name="LoadingRing" Width="48" Height="48" IsActive="False" />
             <StackPanel x:Name="ErrorPanel" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">

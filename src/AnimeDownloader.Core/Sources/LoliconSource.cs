@@ -165,9 +165,12 @@ public sealed class LoliconSource : ImageSourceBase
         var id = pid is null ? null : $"{pid}_{pageIndex}";
         var artist = item?["author"]?.GetValue<string>();
         var extension = InferExtension(url);
+        // regular 是 Pixiv 缩略图（比 original 小得多），用作画廊缩略图
+        var thumbnail = urls?["regular"]?.GetValue<string>();
 
         return new ImageItem(
             Url: url,
+            ThumbnailUrl: string.IsNullOrEmpty(thumbnail) ? null : thumbnail,
             Artist: artist,
             SourceLink: pid is null ? null : $"https://www.pixiv.net/artworks/{pid}",
             Id: id,

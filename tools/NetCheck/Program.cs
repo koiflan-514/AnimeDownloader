@@ -2,21 +2,32 @@ using AnimeDownloader.Core.Models;
 using AnimeDownloader.Core.Services;
 using AnimeDownloader.Core.Sources;
 
-// 验证用户实际配置（safebooru + paged）能否拉到图且字节可解码为图片。
-var settings = new AppSettings { SelectedSource = "safebooru", GallerySubmode = "paged" };
+// 验证：① 缩略图 URL 字段已解析且比原图小；② dmoe 并行拉取速度。
+var settings = new AppSettings();
 var factory = new HttpClientFactory(settings);
 using var http = factory.CreateClient();
 var sources = SourceRegistry.CreateAll(http);
-var source = sources.First(s => s.Id == "safebooru");
 var downloader = new ImageDownloader(http);
 
-var items = await source.GetImagesPageAsync(NsfwMode.BlockNsfw, page: 1, perPage: 3);
-Console.WriteLine($"safebooru paged: {items.Count} items");
-foreach (var item in items)
+// 1) safebooru 缩略图 vs 原图大小对比
+var sb = sources.First(s => s.Id == "safebooru");
+var sbItems = await sb.GetImagesPageAsync(NsfwMode.BlockNsfw, page: 1, perPage: 1);
+if (sbItems.Count > 0)
 {
-    var bytes = await downloader.DownloadAsync(item.Url);
-    // 用 BitmapImage 相同解码路径验证：检查文件头（JPEG FF D8 / PNG 89 50 4E 47）
-    var isJpeg = bytes.Length > 2 && bytes[0] == 0xFF && bytes[1] == 0xD8;
-    var isPng = bytes.Length > 4 && bytes[0] == 0x89 && bytes[1] == 0x50;
-    Console.WriteLine($"  {item.Url} -> {bytes.Length} bytes, jpeg={isJpeg} png={isPng}");
+    var item = sbItems[0];
+    Console.WriteLine($"safebooru thumb={item.ThumbnailUrl}");
+    if (!string.IsNullOrEmpty(item.ThumbnailUrl))
+    {
+        var t = await downloader.DownloadAsync(item.ThumbnailUrl);
+        var f = await downloader.DownloadAsync(item.Url);
+        Console.WriteLine($"  thumb {t.Length} bytes vs full {f.Length} bytes");
+    }
 }
+
+// 2) dmoe 并行拉取 6 张计时
+var dmoe = sources.First(s => s.Id == "dmoe");
+var sw = System.Diagnostics.Stopwatch.StartNew();
+var dmoeItems = await dmoe.GetImagesAsync(NsfwMode.BlockNsfw, count: 6);
+sw.Stop();
+Console.WriteLine($"dmoe 6 items in {sw.ElapsedMilliseconds}ms (parallel)");
+return 0;

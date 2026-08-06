@@ -138,9 +138,11 @@ public sealed class SafebooruSource : ImageSourceBase
         var id = post?["id"]?.GetValue<long>().ToString(System.Globalization.CultureInfo.InvariantCulture);
         var owner = post?["owner"]?.GetValue<string>();
         var extension = InferExtension(url);
+        var thumbnail = post?["preview_url"]?.GetValue<string>();
 
         return new ImageItem(
             Url: url,
+            ThumbnailUrl: string.IsNullOrEmpty(thumbnail) ? null : thumbnail,
             Artist: owner,
             SourceLink: id is null ? null : $"https://safebooru.org/index.php?page=post&s=view&id={id}",
             Id: id,

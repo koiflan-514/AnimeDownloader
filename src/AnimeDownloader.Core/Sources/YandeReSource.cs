@@ -133,9 +133,11 @@ public sealed class YandeReSource : ImageSourceBase
         var id = post?["id"]?.GetValue<long>().ToString(System.Globalization.CultureInfo.InvariantCulture);
         var author = post?["author"]?.GetValue<string>();
         var extension = InferExtension(url);
+        var thumbnail = post?["preview_url"]?.GetValue<string>();
 
         return new ImageItem(
             Url: url,
+            ThumbnailUrl: string.IsNullOrEmpty(thumbnail) ? null : thumbnail,
             Artist: author,
             SourceLink: id is null ? null : $"https://yande.re/post/show/{id}",
             Id: id,

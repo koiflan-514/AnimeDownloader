@@ -135,22 +135,37 @@ public sealed partial class ViewerPage : Page, IModePage
 
     private void OnToggleFullscreen(object sender, RoutedEventArgs e)
     {
-        var presenter = _owner?.AppWindow.Presenter as Microsoft.UI.Windowing.OverlappedPresenter;
-        if (presenter is null)
+        if (_owner is null)
         {
             return;
         }
 
-        if (presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Maximized)
+        if (_owner.AppWindow.Presenter is Microsoft.UI.Windowing.FullScreenPresenter)
         {
-            presenter.Restore();
+            _owner.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Overlapped);
             FullscreenButton.Content = "全屏";
+            ShowChrome();
+            return;
         }
-        else
-        {
-            presenter.Maximize();
-            FullscreenButton.Content = "还原";
-        }
+
+        _owner.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen);
+        FullscreenButton.Content = "退出全屏";
+        HideChrome();
+    }
+
+    /// <summary>全屏时隐藏工具条与状态栏，让图片占满整个窗口。</summary>
+    private void HideChrome()
+    {
+        Toolbar.Visibility = Visibility.Collapsed;
+        StatusText.Visibility = Visibility.Collapsed;
+        ViewArea.CornerRadius = new CornerRadius(0);
+    }
+
+    private void ShowChrome()
+    {
+        Toolbar.Visibility = Visibility.Visible;
+        StatusText.Visibility = Visibility.Visible;
+        ViewArea.CornerRadius = new CornerRadius(8);
     }
 
     private async void OnSave(object sender, RoutedEventArgs e)

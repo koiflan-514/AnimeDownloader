@@ -218,9 +218,11 @@ public sealed class DanbooruSource : ImageSourceBase
         var artist = post?["tag_string_artist"]?.GetValue<string>()?
             .Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
         var extension = InferExtension(url);
+        var thumbnail = post?["preview_file_url"]?.GetValue<string>();
 
         return new ImageItem(
             Url: url,
+            ThumbnailUrl: string.IsNullOrEmpty(thumbnail) ? null : thumbnail,
             Artist: artist,
             SourceLink: id is null ? null : $"{Endpoint}/posts/{id}",
             Id: id,
