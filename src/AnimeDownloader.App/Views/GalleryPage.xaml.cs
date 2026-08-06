@@ -298,11 +298,11 @@ public sealed partial class GalleryPage : Page, IModePage
         var downloader = _owner?.Downloader;
         foreach (var item in _items)
         {
-            var card = new ImageCard
-            {
-                Item = item,
-                Downloader = downloader,
-            };
+            var card = new ImageCard();
+            // 先注入 Downloader 再设 Item：Item 的 DP 回调会立即触发加载，
+            // 若 Downloader 尚未就绪则由其变更回调补加载（双保险）。
+            card.Downloader = downloader;
+            card.Item = item;
             ThumbGrid.Items.Add(card);
         }
     }

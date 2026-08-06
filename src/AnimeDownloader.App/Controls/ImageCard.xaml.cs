@@ -25,7 +25,7 @@ public sealed partial class ImageCard : UserControl
             nameof(Downloader),
             typeof(ImageDownloader),
             typeof(ImageCard),
-            new PropertyMetadata(null));
+            new PropertyMetadata(null, OnDownloaderChanged));
 
     private int _loadToken;
 
@@ -53,15 +53,30 @@ public sealed partial class ImageCard : UserControl
         ((ImageCard)d).LoadThumbnail();
     }
 
+    private static void OnDownloaderChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var card = (ImageCard)d;
+        // 若 Item 已在且当前未成功显示（比如初始化时 Item 先于 Downloader 赋值，
+        // 首次加载因缺下载器走了失败占位），Downloader 就绪后重新加载。
+        if (card.Item is not null && card.Thumb.Source is null && !card._loading)
+        {
+            card.LoadThumbnail();
+        }
+    }
+
+    private bool _loading;
+
     private async void LoadThumbnail()
     {
         var token = ++_loadToken;
+        _loading = true;
         LoadingRing.IsActive = true;
         ErrorOverlay.Visibility = Visibility.Collapsed;
         Thumb.Source = null;
 
         if (Item is null)
         {
+            _loading = false;
             LoadingRing.IsActive = false;
             return;
         }
@@ -69,9 +84,9 @@ public sealed partial class ImageCard : UserControl
         var downloader = Downloader;
         if (downloader is null)
         {
-            // 未注入下载器（理论上画廊页总会注入）：直接显示失败占位，避免永久转圈
-            LoadingRing.IsActive = false;
-            ErrorOverlay.Visibility = Visibility.Visible;
+            // 未注入下载器：复位加载标志并保持加载环，
+            // 等待 Downloader 就绪后由 OnDownloaderChanged 回调重新加载。
+            _loading = false;
             return;
         }
 
@@ -100,6 +115,7 @@ public sealed partial class ImageCard : UserControl
         {
             if (token == _loadToken)
             {
+                _loading = false;
                 LoadingRing.IsActive = false;
             }
         }
