@@ -1,4 +1,5 @@
 using AnimeDownloader.Core.Models;
+using AnimeDownloader.Core.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -6,7 +7,9 @@ using Microsoft.UI.Xaml.Media.Imaging;
 namespace AnimeDownloader.App.Controls;
 
 /// <summary>
-/// 缩略图卡片：异步加载图片，显示加载环，加载失败时显示占位图标。
+/// 缩略图卡片：异步下载图片字节并解码显示（与查看器页一致的可信路径——
+/// 未打包 WinUI3 应用中 BitmapImage 直接加载网络 URL 不可靠），
+/// 加载期间显示加载环，失败时显示占位图标。
 /// </summary>
 public sealed partial class ImageCard : UserControl
 {
@@ -16,6 +19,13 @@ public sealed partial class ImageCard : UserControl
             typeof(ImageItem),
             typeof(ImageCard),
             new PropertyMetadata(null, OnItemChanged));
+
+    public static readonly DependencyProperty DownloaderProperty =
+        DependencyProperty.Register(
+            nameof(Downloader),
+            typeof(ImageDownloader),
+            typeof(ImageCard),
+            new PropertyMetadata(null));
 
     private int _loadToken;
 
@@ -29,6 +39,13 @@ public sealed partial class ImageCard : UserControl
     {
         get => (ImageItem?)GetValue(ItemProperty);
         set => SetValue(ItemProperty, value);
+    }
+
+    /// <summary>共享图片下载器（由画廊页注入，避免每卡片建 HttpClient）。</summary>
+    public ImageDownloader? Downloader
+    {
+        get => (ImageDownloader?)GetValue(DownloaderProperty);
+        set => SetValue(DownloaderProperty, value);
     }
 
     private static void OnItemChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -49,31 +66,26 @@ public sealed partial class ImageCard : UserControl
             return;
         }
 
+        var downloader = Downloader;
+        if (downloader is null)
+        {
+            // 未注入下载器（理论上画廊页总会注入）：直接显示失败占位，避免永久转圈
+            LoadingRing.IsActive = false;
+            ErrorOverlay.Visibility = Visibility.Visible;
+            return;
+        }
+
         try
         {
-            // BitmapImage 本身是异步解码；设置 UriSource 即可在后台线程加载。
+            var bytes = await downloader.DownloadAsync(Item.Url);
+            if (token != _loadToken)
+            {
+                return;
+            }
+
             var bitmap = new BitmapImage();
-            bitmap.ImageOpened += (_, _) =>
-            {
-                if (token != _loadToken)
-                {
-                    return;
-                }
-
-                LoadingRing.IsActive = false;
-                Thumb.Source = bitmap;
-            };
-            bitmap.ImageFailed += (_, _) =>
-            {
-                if (token != _loadToken)
-                {
-                    return;
-                }
-
-                LoadingRing.IsActive = false;
-                ErrorOverlay.Visibility = Visibility.Visible;
-            };
-            bitmap.UriSource = new Uri(Item.Url, UriKind.Absolute);
+            bitmap.SetSource(new MemoryStream(bytes).AsRandomAccessStream());
+            Thumb.Source = bitmap;
         }
         catch (Exception)
         {
@@ -82,8 +94,14 @@ public sealed partial class ImageCard : UserControl
                 return;
             }
 
-            LoadingRing.IsActive = false;
             ErrorOverlay.Visibility = Visibility.Visible;
+        }
+        finally
+        {
+            if (token == _loadToken)
+            {
+                LoadingRing.IsActive = false;
+            }
         }
     }
 }

@@ -9,8 +9,12 @@
         </Border>
         <ProgressRing x:Name="LoadingRing" Width="28" Height="28" IsActive="True" />
         <Border x:Name="ErrorOverlay" Background="{ThemeResource LayerFillColorDefaultBrush}" Visibility="Collapsed">
-            <FontIcon Glyph="&#xE7BA;" FontSize="28"
-                      Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
+                <FontIcon Glyph="&#xE7BA;" FontSize="24"
+                          Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                <TextBlock Text="加载失败" FontSize="11"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
         </Border>
     </Grid>
 </UserControl>

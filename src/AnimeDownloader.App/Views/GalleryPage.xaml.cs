@@ -57,7 +57,6 @@ public sealed partial class GalleryPage : Page, IModePage
 
     public void Attach(MainWindow owner)
     {
-        var firstAttach = _owner is null;
         _owner = owner;
         _sources = owner.Sources;
         _settingsStore = owner.SettingsStore;
@@ -67,7 +66,8 @@ public sealed partial class GalleryPage : Page, IModePage
 
         RestoreState();
         UpdateModeControls();
-        if (firstAttach && _items.Count == 0)
+        // 无论是否首次进入，只要画廊为空就尝试加载（覆盖首次/失败后切回场景）
+        if (_items.Count == 0)
         {
             _ = RequestReload();
         }
@@ -295,20 +295,26 @@ public sealed partial class GalleryPage : Page, IModePage
     private void PopulateGrid()
     {
         ThumbGrid.Items.Clear();
+        var downloader = _owner?.Downloader;
         foreach (var item in _items)
         {
-            ThumbGrid.Items.Add(item);
+            var card = new ImageCard
+            {
+                Item = item,
+                Downloader = downloader,
+            };
+            ThumbGrid.Items.Add(card);
         }
     }
 
     private void OnThumbClick(object sender, ItemClickEventArgs e)
     {
-        if (e.ClickedItem is not ImageItem item || _owner is null)
+        if (e.ClickedItem is not ImageCard card || card.Item is null || _owner is null)
         {
             return;
         }
 
-        var index = _items.ToList().IndexOf(item);
+        var index = _items.ToList().IndexOf(card.Item);
         var viewer = new Controls.GalleryViewerWindow(_owner, _items, index);
         viewer.Activate();
     }

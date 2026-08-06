@@ -8,7 +8,7 @@ namespace AnimeDownloader.Core.Services;
 /// </summary>
 public sealed class HttpClientFactory
 {
-    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(20);
 
     private readonly AppSettings _settings;
     private readonly HttpMessageHandler? _handlerOverride;

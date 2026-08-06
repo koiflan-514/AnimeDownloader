@@ -130,10 +130,10 @@ public sealed class WaifuImSource : ImageSourceBase
             return null;
         }
 
-        var id = node?["id"]?.GetValue<string>();
-        var artist = node?["artists"]?[0]?["name"]?.GetValue<string>();
-        var source = node?["source"]?.GetValue<string>();
-        var extension = node?["extension"]?.GetValue<string>() ?? InferExtension(url);
+        var id = ReadStringValue(node?["id"]);
+        var artist = ReadStringValue(node?["artists"]?[0]?["name"]);
+        var source = ReadStringValue(node?["source"]);
+        var extension = ReadStringValue(node?["extension"]) ?? InferExtension(url);
 
         return new ImageItem(
             Url: url,
@@ -143,6 +143,14 @@ public sealed class WaifuImSource : ImageSourceBase
             Extension: extension,
             Metadata: new Dictionary<string, object?> { ["raw"] = root?.ToJsonString() });
     }
+
+    /// <summary>将 JSON 节点读取为字符串：兼容字符串与数字（如 waifu.im 的 id 为数字）。</summary>
+    private static string? ReadStringValue(JsonNode? node) => node switch
+    {
+        null => null,
+        JsonValue value when value.TryGetValue<string>(out var s) => s,
+        _ => node?.ToString(),
+    };
 
     private static string? InferExtension(string url)
     {

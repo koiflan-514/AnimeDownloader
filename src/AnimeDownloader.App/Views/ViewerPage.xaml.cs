@@ -32,13 +32,13 @@ public sealed partial class ViewerPage : Page, IModePage
 
     public void Attach(MainWindow owner)
     {
-        var firstAttach = _owner is null;
         _owner = owner;
         _settingsStore = owner.SettingsStore;
         _downloader = owner.Downloader;
         _currentSource = owner.CurrentSource;
         _nsfwMode = owner.CurrentNsfwMode;
-        if (firstAttach)
+        // 无论是否首次进入，只要尚未显示图片就尝试加载
+        if (_current is null)
         {
             _ = LoadRandomAsync();
         }

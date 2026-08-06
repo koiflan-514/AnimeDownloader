@@ -91,6 +91,21 @@ public class SourceLogicTests
     }
 
     [Fact]
+    public async Task WaifuIm_NumericId_DoesNotThrow()
+    {
+        // waifu.im 的 id 是 JSON 数字：必须能正常解析而不抛异常
+        using var http = CreateHttp(_ => JsonResponse(
+            """{"items":[{"id":12345,"url":"https://i.waifu.im/y.jpg","artists":[{"name":"Artist"}]}]}"""));
+        var source = new WaifuImSource(http);
+
+        var item = await source.GetRandomImageAsync(NsfwMode.BlockNsfw);
+
+        Assert.NotNull(item);
+        Assert.Equal("12345", item!.Id);
+        Assert.Equal("Artist", item.Artist);
+    }
+
+    [Fact]
     public async Task Danbooru_GetImages_FiltersForbiddenTags()
     {
         using var http = CreateHttp(_ => JsonResponse(

@@ -45,11 +45,6 @@
                     <ItemsWrapGrid Orientation="Horizontal" ItemWidth="180" ItemHeight="180" />
                 </ItemsPanelTemplate>
             </GridView.ItemsPanel>
-            <GridView.ItemTemplate>
-                <DataTemplate>
-                    <controls:ImageCard Width="180" Height="180" Item="{Binding}" />
-                </DataTemplate>
-            </GridView.ItemTemplate>
         </GridView>
 
         <!-- 状态栏 -->
