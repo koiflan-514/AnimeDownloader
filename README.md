@@ -24,17 +24,21 @@
 ## 构建 / Building
 
 要求：Windows 10 1809+，.NET 10 SDK（10.0.302 或更新）。
+应用为未打包桌面应用（`WindowsPackageType=None`），`dotnet build` 后即可直接运行，
+目标机器无需安装 Windows App SDK（自包含运行时已随输出目录分发）。
 
 ```bash
 dotnet restore
-dotnet build AnimeDownloader.sln -c Debug
-dotnet test  AnimeDownloader.sln -c Debug
+dotnet build AnimeDownloader.slnx -c Debug
+dotnet test  AnimeDownloader.slnx -c Debug
 ```
 
-运行：
+运行（GUI 应用）：
 
 ```bash
 dotnet run --project src/AnimeDownloader.App -c Debug
+# 或直接运行输出目录中的 exe：
+# src/AnimeDownloader.App/bin/Debug/net10.0-windows10.0.19041.0/win-x64/AnimeDownloader.App.exe
 ```
 
 ## 项目结构
