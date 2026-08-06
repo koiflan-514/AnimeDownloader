@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using AnimeDownloader.Core.Models;
+using AnimeDownloader.Core.Services;
 using AnimeDownloader.Core.Sources;
 
 namespace AnimeDownloader.Core.Tests;
@@ -190,6 +191,40 @@ public class SourceLogicTests
         var item = new ImageItem("https://example.com/img/abc.png?size=full");
 
         Assert.Equal("png", item.InferExtensionFromUrl());
+    }
+
+    [Fact]
+    public async Task ImageDownloader_RejectsOversizedContent()
+    {
+        var handler = new StubHandler(_ =>
+        {
+            var response = new HttpResponseMessage(System.Net.HttpStatusCode.OK);
+            response.Content = new ByteArrayContent(new byte[1024]);
+            response.Content.Headers.ContentLength = ImageDownloader.MaxDownloadBytes + 1;
+            return response;
+        });
+        using var http = new HttpClient(handler);
+        var downloader = new ImageDownloader(http);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => downloader.DownloadAsync("https://example.com/big.jpg"));
+    }
+
+    [Fact]
+    public async Task ImageDownloader_StreamsContentWithinLimit()
+    {
+        var handler = new StubHandler(_ =>
+        {
+            var response = new HttpResponseMessage(System.Net.HttpStatusCode.OK);
+            response.Content = new ByteArrayContent(new byte[4096]);
+            return response;
+        });
+        using var http = new HttpClient(handler);
+        var downloader = new ImageDownloader(http);
+
+        var bytes = await downloader.DownloadAsync("https://example.com/ok.jpg");
+
+        Assert.Equal(4096, bytes.Length);
     }
 
     private static HttpResponseMessage JsonResponse(string json)

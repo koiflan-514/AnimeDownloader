@@ -1,5 +1,8 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/AnimeDownloader.App/AnimeDownloader.App.csproj">
+      <Platform Project="x64" />
+    </Project>
     <Project Path="src/AnimeDownloader.Core/AnimeDownloader.Core.csproj" />
   </Folder>
   <Folder Name="/tests/">

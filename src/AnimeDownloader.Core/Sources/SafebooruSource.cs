@@ -80,7 +80,7 @@ public sealed class SafebooruSource : ImageSourceBase
             return Array.Empty<ImageItem>();
         }
 
-        var data = await GetJsonAsync(Endpoint, BaseQuery(Math.Max(count, 1), null), cancellationToken).ConfigureAwait(false);
+        var data = await GetJsonAsync(Endpoint, BaseQuery(Math.Max(count, 1), 0), cancellationToken).ConfigureAwait(false);
         return CollectItems(data, count);
     }
 

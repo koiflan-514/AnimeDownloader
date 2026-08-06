@@ -1,0 +1,16 @@
+<UserControl
+    x:Class="AnimeDownloader.App.Controls.ImageCard"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid>
+        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+            <Image x:Name="Thumb" Stretch="UniformToFill" />
+        </Border>
+        <ProgressRing x:Name="LoadingRing" Width="28" Height="28" IsActive="True" />
+        <Border x:Name="ErrorOverlay" Background="{ThemeResource LayerFillColorDefaultBrush}" Visibility="Collapsed">
+            <FontIcon Glyph="&#xE7BA;" FontSize="28"
+                      Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Border>
+    </Grid>
+</UserControl>

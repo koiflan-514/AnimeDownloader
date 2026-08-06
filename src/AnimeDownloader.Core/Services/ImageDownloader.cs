@@ -16,6 +16,9 @@ public readonly record struct DownloadProgress(long DownloadedBytes, long? Total
 /// </summary>
 public sealed class ImageDownloader
 {
+    /// <summary>单张图片下载上限（避免恶意/异常响应耗尽内存）。</summary>
+    public const long MaxDownloadBytes = 200 * 1024 * 1024;
+
     private readonly HttpClient _http;
 
     public ImageDownloader(HttpClient http)
@@ -28,6 +31,7 @@ public sealed class ImageDownloader
     /// </summary>
     /// <returns>成功时返回字节数组。</returns>
     /// <exception cref="HttpRequestException">网络错误或非成功状态码。</exception>
+    /// <exception cref="InvalidOperationException">响应超过 <see cref="MaxDownloadBytes"/> 上限。</exception>
     public async Task<byte[]> DownloadAsync(
         string url,
         IProgress<DownloadProgress>? progress = null,
@@ -38,6 +42,11 @@ public sealed class ImageDownloader
         response.EnsureSuccessStatusCode();
 
         var total = response.Content.Headers.ContentLength;
+        if (total is > MaxDownloadBytes)
+        {
+            throw new InvalidOperationException($"图片过大（>{MaxDownloadBytes / (1024 * 1024)}MB），已取消下载");
+        }
+
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var buffer = new MemoryStream();
         var chunk = new byte[81920];
@@ -45,8 +54,13 @@ public sealed class ImageDownloader
         int read;
         while ((read = await stream.ReadAsync(chunk, cancellationToken).ConfigureAwait(false)) > 0)
         {
-            await buffer.WriteAsync(chunk.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
             downloaded += read;
+            if (downloaded > MaxDownloadBytes)
+            {
+                throw new InvalidOperationException($"图片过大（>{MaxDownloadBytes / (1024 * 1024)}MB），已取消下载");
+            }
+
+            await buffer.WriteAsync(chunk.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
             progress?.Report(new DownloadProgress(downloaded, total));
         }
 

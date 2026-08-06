@@ -90,4 +90,18 @@ public class SettingsStoreTests : IDisposable
         var core = storage.ToCore();
         Assert.Equal(storage, core.ToStorage());
     }
+
+    [Fact]
+    public void Load_WhenConfigCorrupt_ReturnsDefaultsAndBacksUp()
+    {
+        var store = new SettingsStore(_tempDir);
+        Directory.CreateDirectory(_tempDir);
+        File.WriteAllText(store.ConfigFile, "{ not valid json !!");
+
+        var settings = store.Load();
+
+        Assert.Equal(NsfwModeStorage.BlockNsfw, settings.NsfwMode);
+        var backups = Directory.GetFiles(_tempDir, "config.json.corrupt-*");
+        Assert.Single(backups);
+    }
 }

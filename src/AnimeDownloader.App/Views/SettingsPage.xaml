@@ -1,0 +1,49 @@
+<Page
+    x:Class="AnimeDownloader.App.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Padding="24,12" Spacing="16" MaxWidth="720" HorizontalAlignment="Left">
+            <TextBlock Text="设置" Style="{StaticResource TitleTextBlockStyle}" />
+
+            <!-- 通用 -->
+            <Expander Header="通用" IsExpanded="True">
+                <StackPanel Spacing="8" Padding="0,8">
+                    <ComboBox x:Name="NsfwCombo" Header="NSFW 过滤" Width="240">
+                        <ComboBoxItem Content="屏蔽 NSFW" Tag="BlockNsfw" />
+                        <ComboBoxItem Content="仅 NSFW" Tag="OnlyNsfw" />
+                        <ComboBoxItem Content="全部显示" Tag="ShowEverything" />
+                    </ComboBox>
+                    <ComboBox x:Name="ThemeCombo" Header="主题" Width="240">
+                        <ComboBoxItem Content="跟随系统" Tag="default" />
+                        <ComboBoxItem Content="浅色" Tag="light" />
+                        <ComboBoxItem Content="深色" Tag="dark" />
+                    </ComboBox>
+                    <NumberBox x:Name="IntervalBox" Header="自动刷新间隔（秒）" Minimum="1" Value="30" SpinButtonPlacementMode="Compact" Width="240" />
+                    <NumberBox x:Name="CountBox" Header="画廊每页数量" Minimum="1" Value="12" SpinButtonPlacementMode="Compact" Width="240" />
+                    <CheckBox x:Name="AutoReloadCheck" Content="启用自动刷新" />
+                </StackPanel>
+            </Expander>
+
+            <!-- 代理 -->
+            <Expander Header="网络与代理">
+                <StackPanel Spacing="8" Padding="0,8">
+                    <TextBox x:Name="ProxyBox" Header="手动代理地址（留空则自动检测系统代理）" PlaceholderText="http://127.0.0.1:7890" Width="400" />
+                    <CheckBox x:Name="NoProxyCheck" Content="不使用代理（直连）" />
+                </StackPanel>
+            </Expander>
+
+            <!-- 图源标签 -->
+            <Expander x:Name="TagsExpander" Header="图源标签">
+                <StackPanel x:Name="TagsPanel" Spacing="8" Padding="0,8" />
+            </Expander>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button x:Name="SaveButton" Content="保存设置" Style="{StaticResource AccentButtonStyle}" Click="OnSave" />
+                <Button x:Name="ResetButton" Content="恢复默认" Click="OnReset" />
+            </StackPanel>
+            <TextBlock x:Name="StatusText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        </StackPanel>
+    </ScrollViewer>
+</Page>

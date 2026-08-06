@@ -32,6 +32,9 @@ public sealed class AppSettings
 
     /// <summary>true 时忽略系统代理，直连（不读取环境变量与注册表）。</summary>
     public bool UseNoProxy { get; set; }
+
+    /// <summary>应用主题：default（跟随系统）/ light / dark。</summary>
+    public string Theme { get; set; } = "default";
 }
 
 /// <summary>
@@ -97,7 +100,8 @@ public sealed class SettingsStore
 
     /// <summary>
     /// 读取设置：文件不存在时返回默认设置（不落盘，首次写入时才创建目录与文件）。
-    /// 解析失败时抛出 <see cref="JsonException"/>。
+    /// 文件损坏时备份原文件并返回默认设置，避免应用启动崩溃（对应参考项目
+    /// 对解析异常的兜底处理）。
     /// </summary>
     public AppSettings Load()
     {
@@ -109,10 +113,35 @@ public sealed class SettingsStore
             }
 
             var json = File.ReadAllText(_configFile);
-            var settings = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions)
-                ?? new AppSettings();
+            AppSettings settings;
+            try
+            {
+                settings = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions)
+                    ?? new AppSettings();
+            }
+            catch (JsonException)
+            {
+                BackupCorruptConfig(json);
+                settings = new AppSettings();
+            }
+
             settings.SourceTags ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             return settings;
+        }
+    }
+
+    /// <summary>将无法解析的配置文件重命名为 .corrupt 备份，防止覆盖用户数据。</summary>
+    private void BackupCorruptConfig(string content)
+    {
+        try
+        {
+            Directory.CreateDirectory(_configDirectory);
+            var backup = _configFile + $".corrupt-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+            File.WriteAllText(backup, content);
+        }
+        catch (IOException)
+        {
+            // 备份失败不影响返回默认设置
         }
     }
 

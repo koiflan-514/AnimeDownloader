@@ -1,0 +1,36 @@
+<Window
+    x:Class="AnimeDownloader.App.Controls.GalleryViewerWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="图片查看器">
+
+    <Grid x:Name="Root" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 顶部工具条 -->
+        <Grid Grid.Row="0" Padding="12,8">
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
+                <Button x:Name="PrevButton" Content="上一张" Click="OnPrev" />
+                <TextBlock x:Name="IndexLabel" Text="1 / 1" VerticalAlignment="Center" />
+                <Button x:Name="NextButton" Content="下一张" Click="OnNext" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                <Button x:Name="FullscreenButton" Content="全屏" Click="OnToggleFullscreen" />
+                <Button x:Name="SaveButton" Content="保存" Click="OnSave" />
+            </StackPanel>
+        </Grid>
+
+        <!-- 图片区域 -->
+        <Grid Grid.Row="1">
+            <Image x:Name="ViewImage" Stretch="Uniform" />
+            <ProgressRing x:Name="LoadingRing" Width="40" Height="40" IsActive="False" />
+            <StackPanel x:Name="ErrorPanel" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <FontIcon Glyph="&#xE7BA;" FontSize="40" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <TextBlock x:Name="ErrorText" Text="加载失败" Margin="0,8,0,0" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>
