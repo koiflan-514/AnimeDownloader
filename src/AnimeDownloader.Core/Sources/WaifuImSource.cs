@@ -1,0 +1,159 @@
+using System.Text.Json.Nodes;
+using AnimeDownloader.Core.Models;
+
+namespace AnimeDownloader.Core.Sources;
+
+/// <summary>
+/// Waifu 图源：https://api.waifu.im（支持分页，IsNsfw 参数大小写敏感）。
+/// </summary>
+public sealed class WaifuImSource : ImageSourceBase
+{
+    private const string Endpoint = "https://api.waifu.im/images";
+
+    public WaifuImSource(HttpClient http)
+        : base(http, "waifuim")
+    {
+    }
+
+    public override string DisplayName => "Waifu";
+
+    public override string Description => "Generate images from waifu.im.";
+
+    public override bool SupportsPaging => true;
+
+    private static string NsfwParameter(NsfwMode mode) => mode switch
+    {
+        NsfwMode.ShowEverything => "All",
+        NsfwMode.OnlyNsfw => "True",
+        _ => "False",
+    };
+
+    /// <inheritdoc />
+    public override async Task<ImageItem?> GetRandomImageAsync(
+        NsfwMode mode,
+        CancellationToken cancellationToken = default)
+    {
+        var data = await GetJsonAsync(
+            Endpoint,
+            new Dictionary<string, string?> { ["IsNsfw"] = NsfwParameter(mode), ["PageSize"] = "1" },
+            cancellationToken).ConfigureAwait(false);
+        var item = data?["items"]?[0];
+        if (item is null)
+        {
+            return null;
+        }
+
+        return BuildItem(item, data);
+    }
+
+    /// <inheritdoc />
+    public override async Task<IReadOnlyList<ImageItem>> GetImagesAsync(
+        NsfwMode mode,
+        int count,
+        CancellationToken cancellationToken = default)
+    {
+        if (count <= 0)
+        {
+            return Array.Empty<ImageItem>();
+        }
+
+        var pageSize = Math.Min(count, 30);
+        var data = await GetJsonAsync(
+            Endpoint,
+            new Dictionary<string, string?>
+            {
+                ["IsNsfw"] = NsfwParameter(mode),
+                ["PageSize"] = pageSize.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["Page"] = "1",
+            },
+            cancellationToken).ConfigureAwait(false);
+
+        var items = new List<ImageItem>(count);
+        foreach (var node in data?["items"]?.AsArray() ?? Enumerable.Empty<JsonNode?>())
+        {
+            var item = BuildItem(node, data);
+            if (item is not null)
+            {
+                items.Add(item);
+            }
+
+            if (items.Count >= count)
+            {
+                break;
+            }
+        }
+
+        return items;
+    }
+
+    /// <inheritdoc />
+    public override async Task<IReadOnlyList<ImageItem>> GetImagesPageAsync(
+        NsfwMode mode,
+        int page,
+        int perPage,
+        CancellationToken cancellationToken = default)
+    {
+        if (perPage <= 0)
+        {
+            return Array.Empty<ImageItem>();
+        }
+
+        var pageSize = Math.Min(perPage, 30);
+        var data = await GetJsonAsync(
+            Endpoint,
+            new Dictionary<string, string?>
+            {
+                ["IsNsfw"] = NsfwParameter(mode),
+                ["PageSize"] = pageSize.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["Page"] = Math.Max(page, 1).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            },
+            cancellationToken).ConfigureAwait(false);
+
+        var items = new List<ImageItem>(perPage);
+        foreach (var node in data?["items"]?.AsArray() ?? Enumerable.Empty<JsonNode?>())
+        {
+            var item = BuildItem(node, data);
+            if (item is not null)
+            {
+                items.Add(item);
+            }
+        }
+
+        return items;
+    }
+
+    private static ImageItem? BuildItem(JsonNode? node, JsonNode? root)
+    {
+        var url = node?["url"]?.GetValue<string>();
+        if (string.IsNullOrEmpty(url))
+        {
+            return null;
+        }
+
+        var id = node?["id"]?.GetValue<string>();
+        var artist = node?["artists"]?[0]?["name"]?.GetValue<string>();
+        var source = node?["source"]?.GetValue<string>();
+        var extension = node?["extension"]?.GetValue<string>() ?? InferExtension(url);
+
+        return new ImageItem(
+            Url: url,
+            Artist: artist,
+            SourceLink: source,
+            Id: id,
+            Extension: extension,
+            Metadata: new Dictionary<string, object?> { ["raw"] = root?.ToJsonString() });
+    }
+
+    private static string? InferExtension(string url)
+    {
+        var path = url.Split('?')[0];
+        var dot = path.LastIndexOf('.');
+        if (dot < 0 || dot == path.Length - 1)
+        {
+            return null;
+        }
+
+        var ext = path[(dot + 1)..];
+        return ext.Length is > 0 and <= 8 ? ext : null;
+    }
+}
