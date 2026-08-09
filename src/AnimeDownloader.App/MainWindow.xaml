@@ -5,71 +5,44 @@
     Title="AnimeDownloader">
 
     <Grid x:Name="Root">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
-        <!-- 全局工具栏：两种模式（查看器/画廊）共享的图源、NSFW 过滤与刷新 -->
-        <Grid Grid.Row="0" Padding="24,10,24,6" ColumnSpacing="12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                <TextBlock Text="图源" VerticalAlignment="Center"
-                           Style="{StaticResource CaptionTextBlockStyle}"
-                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                <ComboBox
-                    x:Name="SourceCombo"
-                    MinWidth="240"
-                    MaxDropDownHeight="360"
-                    SelectionChanged="OnSourceSelectionChanged">
-                    <ComboBox.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Padding="0,4" Spacing="2">
-                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding Description}" FontSize="11"
-                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                           TextTrimming="CharacterEllipsis" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                </ComboBox>
-            </StackPanel>
-
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-                <TextBlock Text="NSFW" VerticalAlignment="Center"
-                           Style="{StaticResource CaptionTextBlockStyle}"
-                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                <ComboBox x:Name="NsfwCombo" MinWidth="130" SelectionChanged="OnNsfwSelectionChanged">
-                    <ComboBoxItem Content="屏蔽 NSFW" Tag="BlockNsfw" />
-                    <ComboBoxItem Content="仅 NSFW" Tag="OnlyNsfw" />
-                    <ComboBoxItem Content="全部显示" Tag="ShowEverything" />
-                </ComboBox>
-            </StackPanel>
-
-            <Button Grid.Column="3" x:Name="GlobalRefreshButton" Content="刷新"
-                    VerticalAlignment="Center" Click="OnGlobalRefresh" />
-
-            <TextBlock Grid.Column="4" x:Name="GlobalStatusText"
-                       Text="就绪" VerticalAlignment="Center" HorizontalAlignment="Right"
-                       TextTrimming="CharacterEllipsis"
-                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-        </Grid>
-
         <NavigationView
-            Grid.Row="1"
             x:Name="RootNav"
-            PaneDisplayMode="Top"
+            PaneDisplayMode="Left"
+            OpenPaneLength="320"
+            CompactPaneLength="48"
+            IsPaneOpen="True"
             IsBackButtonVisible="Collapsed"
             IsSettingsVisible="False"
+            PaneOpening="OnPaneOpening"
+            PaneClosing="OnPaneClosing"
             SelectionChanged="OnNavigationSelectionChanged"
             Loaded="OnNavigationLoaded">
+
+            <NavigationView.PaneHeader>
+                <Grid Padding="8,8,8,12">
+                    <StackPanel x:Name="PaneHeaderExpanded" Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE8B9;" FontSize="22"
+                                  Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                  VerticalAlignment="Center" />
+                        <TextBlock x:Name="TitleText" Text="AnimeDownloader"
+                                   Style="{StaticResource TitleTextBlockStyle}" FontSize="16"
+                                   VerticalAlignment="Center" />
+                        <Border x:Name="HeaderThumbBorder" Width="36" Height="36" CornerRadius="6"
+                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                VerticalAlignment="Center"
+                                Visibility="Collapsed">
+                            <Image x:Name="HeaderThumb" Stretch="UniformToFill" />
+                        </Border>
+                    </StackPanel>
+                    <StackPanel x:Name="PaneHeaderCompact" Visibility="Collapsed"
+                                HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE8B9;" FontSize="24"
+                                  Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                    </StackPanel>
+                </Grid>
+            </NavigationView.PaneHeader>
 
             <NavigationView.MenuItems>
                 <NavigationViewItem x:Name="GalleryNavItem" Content="画廊" Tag="gallery">
@@ -88,6 +61,56 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
             </NavigationView.MenuItems>
+
+            <NavigationView.PaneCustomContent>
+                <StackPanel Spacing="10" Padding="0,12,0,0">
+                    <TextBlock x:Name="SourceLabel" Text="图源"
+                               Style="{StaticResource CaptionTextBlockStyle}"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <ComboBox
+                        x:Name="SourceCombo"
+                        HorizontalAlignment="Stretch"
+                        MaxDropDownHeight="360"
+                        SelectionChanged="OnSourceSelectionChanged">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Padding="0,4" Spacing="2">
+                                    <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding Description}" FontSize="11"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <TextBlock x:Name="NsfwLabel" Text="NSFW"
+                               Style="{StaticResource CaptionTextBlockStyle}"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <ComboBox x:Name="NsfwCombo" HorizontalAlignment="Stretch"
+                              SelectionChanged="OnNsfwSelectionChanged">
+                        <ComboBoxItem Content="屏蔽 NSFW" Tag="BlockNsfw" />
+                        <ComboBoxItem Content="仅 NSFW" Tag="OnlyNsfw" />
+                        <ComboBoxItem Content="全部显示" Tag="ShowEverything" />
+                    </ComboBox>
+
+                    <Button x:Name="GlobalRefreshButton" HorizontalAlignment="Stretch"
+                            Style="{StaticResource AccentButtonStyle}"
+                            Click="OnGlobalRefresh" ToolTipService.ToolTip="刷新当前页面">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                            <TextBlock Text="刷新" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </NavigationView.PaneCustomContent>
+
+            <NavigationView.PaneFooter>
+                <Border Style="{StaticResource AppStatusBarStyle}" Margin="8,12,8,8">
+                    <TextBlock x:Name="GlobalStatusText" Text="就绪"
+                               Style="{StaticResource AppCaptionTextStyle}" />
+                </Border>
+            </NavigationView.PaneFooter>
 
             <Frame x:Name="ContentFrame" />
         </NavigationView>

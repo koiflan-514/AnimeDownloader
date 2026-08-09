@@ -19,6 +19,9 @@ public sealed class NekosMoeSource : ImageSourceBase
 
     public override string Description => "Generate images from nekos.moe.";
 
+    /// <inheritdoc />
+    public override string? ProbeUrl => Endpoint;
+
     private static string BuildQuery(NsfwMode mode, int? count = null)
     {
         var query = mode switch

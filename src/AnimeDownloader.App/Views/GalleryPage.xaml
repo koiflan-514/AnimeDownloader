@@ -1,46 +1,58 @@
 <Page
     x:Class="AnimeDownloader.App.Views.GalleryPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:controls="using:AnimeDownloader.App.Controls">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <Grid Padding="24,8,24,12" RowSpacing="8">
+    <Grid Padding="16,8,16,12" RowSpacing="8">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- 画廊工具栏：模式切换与分页（水平居中） -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
-            <ToggleButton
-                x:Name="ModeToggle"
-                Content="随机模式"
-                Checked="OnModeToggleChecked"
-                Unchecked="OnModeToggleUnchecked" />
+        <CommandBar x:Name="GalleryBar" Grid.Row="0"
+                    IsOpen="False"
+                    DefaultLabelPosition="Right">
+            <AppBarToggleButton x:Name="ModeToggle" Label="随机模式"
+                                Click="OnModeToggleClick">
+                <AppBarToggleButton.Icon>
+                    <FontIcon Glyph="&#xE8A9;" />
+                </AppBarToggleButton.Icon>
+            </AppBarToggleButton>
+            <AppBarButton x:Name="PrevPageButton" Label="上一页" Click="OnPrevPage">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE76B;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton x:Name="NextPageButton" Label="下一页" Click="OnNextPage">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE76C;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton x:Name="DownloadAllButton" Label="下载全部" Click="OnDownloadAll">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE896;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarToggleButton x:Name="AutoReloadToggle" Label="自动刷新"
+                                Click="OnAutoReloadClick">
+                <AppBarToggleButton.Icon>
+                    <FontIcon Glyph="&#xE72C;" />
+                </AppBarToggleButton.Icon>
+            </AppBarToggleButton>
+            <CommandBar.Content>
+                <TextBlock x:Name="PageLabel" Text="第 1 页"
+                           Style="{StaticResource AppCaptionTextStyle}" Margin="12,0" />
+            </CommandBar.Content>
+        </CommandBar>
 
-            <StackPanel x:Name="PageControls" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                <Button x:Name="PrevPageButton" Content="上一页" Click="OnPrevPage" />
-                <TextBlock x:Name="PageLabel" Text="第 1 页" VerticalAlignment="Center" Margin="4,0" />
-                <Button x:Name="NextPageButton" Content="下一页" Click="OnNextPage" />
-            </StackPanel>
-
-            <TextBlock x:Name="PagingHint" Text="该图源不支持分页浏览，已切换为随机模式"
-                       VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-
-            <ToggleSwitch x:Name="AutoReloadSwitch" Header="自动刷新" Margin="12,0,0,0"
-                          Toggled="OnAutoReloadToggled" />
-        </StackPanel>
-
-        <!-- 缩略图网格（内容居中） -->
         <GridView
             x:Name="ThumbGrid"
             Grid.Row="1"
             SelectionMode="None"
             IsItemClickEnabled="True"
             ItemClick="OnThumbClick"
-            Padding="0,4,0,0"
-            HorizontalAlignment="Center">
+            SizeChanged="OnGridSizeChanged">
             <GridView.ItemsPanel>
                 <ItemsPanelTemplate>
                     <ItemsWrapGrid Orientation="Horizontal" ItemWidth="180" ItemHeight="180" />
@@ -48,17 +60,26 @@
             </GridView.ItemsPanel>
         </GridView>
 
-        <!-- 状态栏 -->
-        <Grid Grid.Row="2" ColumnSpacing="8">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <ProgressRing x:Name="LoadingRing" Grid.Column="0" Width="20" Height="20" IsActive="False" />
-            <TextBlock x:Name="StatusText" Grid.Column="1" Text="就绪" VerticalAlignment="Center" />
-            <Button x:Name="RetryButton" Grid.Column="2" Content="重试" HorizontalAlignment="Left"
-                    Visibility="Collapsed" Click="OnRetry" />
-        </Grid>
+        <Border Grid.Row="2" Style="{StaticResource AppStatusBarStyle}">
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ProgressRing x:Name="LoadingRing" Grid.Column="0" Width="18" Height="18"
+                              IsActive="False" />
+                <ProgressBar x:Name="BatchProgress" Grid.Column="1" Width="180"
+                             Visibility="Collapsed" Minimum="0" Maximum="1" Value="0" />
+                <TextBlock x:Name="StatusText" Grid.Column="2" Text="就绪"
+                           Style="{StaticResource AppCaptionTextStyle}" />
+                <Button x:Name="CancelBatchButton" Grid.Column="3" Content="取消"
+                        Visibility="Collapsed" Click="OnCancelBatch" />
+                <Button x:Name="RetryButton" Grid.Column="4" Content="重试"
+                        Visibility="Collapsed" Click="OnRetry" />
+            </Grid>
+        </Border>
     </Grid>
 </Page>

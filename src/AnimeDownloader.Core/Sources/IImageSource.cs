@@ -26,6 +26,12 @@ public interface IImageSource
     /// <summary>当前标签串（空格分隔）；仅 <see cref="SupportsTags"/> 为 true 时有意义。</summary>
     string Tags { get; set; }
 
+    /// <summary>Diagnostic message from the most recent failed request, when available.</summary>
+    string? LastError { get; }
+
+    /// <summary>Endpoint URL used by the connectivity probe (reachability check).</summary>
+    string? ProbeUrl { get; }
+
     /// <summary>获取一张随机图片；失败或无结果时返回 null。</summary>
     Task<ImageItem?> GetRandomImageAsync(
         NsfwMode mode,

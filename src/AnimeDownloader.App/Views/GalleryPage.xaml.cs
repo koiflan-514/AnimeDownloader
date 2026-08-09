@@ -1,19 +1,24 @@
-using AnimeDownloader.App.Controls;
 using AnimeDownloader.Core.Models;
 using AnimeDownloader.Core.Services;
 using AnimeDownloader.Core.Sources;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Navigation;
+using Windows.Storage.Pickers;
 
 namespace AnimeDownloader.App.Views;
 
 /// <summary>
-/// 画廊页：随机 / 分页两种模式展示缩略图网格，支持自动刷新与点击打开全屏查看器。
-/// 图源与 NSFW 过滤由主窗口全局工具栏提供（对应参考项目窗口级 source_selector）。
+/// Gallery page: random / paged thumbnail grid with auto reload, responsive item sizing and
+/// whole-page batch download with progress and cancellation.
 /// </summary>
+#pragma warning disable CA1001 // _batchCts is disposed in the batch finally block.
 public sealed partial class GalleryPage : Page, IModePage
 {
+#pragma warning restore CA1001
+    private const double ItemSpacing = 8;
+    private const double MinItemSize = 120;
+    private const double MaxItemSize = 220;
+
     private MainWindow? _owner;
     private IReadOnlyList<IImageSource> _sources = Array.Empty<IImageSource>();
     private SettingsStore _settingsStore = null!;
@@ -30,6 +35,7 @@ public sealed partial class GalleryPage : Page, IModePage
     private DispatcherTimer? _autoReloadTimer;
     private int _galleryCount;
     private IReadOnlyList<ImageItem> _items = Array.Empty<ImageItem>();
+    private CancellationTokenSource? _batchCts;
 
     public GalleryPage()
     {
@@ -38,16 +44,14 @@ public sealed partial class GalleryPage : Page, IModePage
         Unloaded += (_, _) => OnPageUnloaded();
     }
 
-    /// <summary>页面回到可视树：恢复自动刷新（若已启用）。</summary>
     private void OnPageLoaded()
     {
-        if (_owner is not null && AutoReloadSwitch.IsOn && !_isLoading)
+        if (_owner is not null && AutoReloadToggle.IsChecked == true && !_isLoading)
         {
             StartAutoReload();
         }
     }
 
-    /// <summary>页面离开可视树：暂停自动刷新，避免后台空转。</summary>
     private void OnPageUnloaded()
     {
         StopAutoReload();
@@ -66,7 +70,6 @@ public sealed partial class GalleryPage : Page, IModePage
 
         RestoreState();
         UpdateModeControls();
-        // 无论是否首次进入，只要画廊为空就尝试加载（覆盖首次/失败后切回场景）
         if (_items.Count == 0)
         {
             _ = RequestReload();
@@ -99,18 +102,17 @@ public sealed partial class GalleryPage : Page, IModePage
 
     public void Reload() => _ = RequestReload();
 
-    // ---------------- 状态恢复 ----------------
+    // ---------------- State ----------------
 
     private void RestoreState()
     {
-        // 子模式：random / paged（来自持久化设置）；抑制控件事件避免重复加载
         _restoringState = true;
         try
         {
             _pagedMode = _settings.GallerySubmode == "paged";
             ModeToggle.IsChecked = _pagedMode;
-            _galleryCount = _settings.GalleryCount > 0 ? _settings.GalleryCount : 12;
-            AutoReloadSwitch.IsOn = _settings.AutoReloadEnabled;
+            _galleryCount = Math.Clamp(_settings.GalleryCount > 0 ? _settings.GalleryCount : 12, 1, 48);
+            AutoReloadToggle.IsChecked = _settings.AutoReloadEnabled;
         }
         finally
         {
@@ -120,40 +122,25 @@ public sealed partial class GalleryPage : Page, IModePage
 
     private void UpdateModeControls()
     {
-        ModeToggle.Content = _pagedMode ? "分页模式" : "随机模式";
+        ModeToggle.Label = _pagedMode ? "分页模式" : "随机模式";
+        ModeToggle.IsChecked = _pagedMode;
         var supportsPaging = _pagedMode && _currentSource.SupportsPaging;
-        PageControls.Visibility = supportsPaging ? Visibility.Visible : Visibility.Collapsed;
-        PagingHint.Visibility = _pagedMode && !_currentSource.SupportsPaging
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        PrevPageButton.Visibility = supportsPaging ? Visibility.Visible : Visibility.Collapsed;
+        NextPageButton.Visibility = supportsPaging ? Visibility.Visible : Visibility.Collapsed;
+        PageLabel.Visibility = supportsPaging ? Visibility.Visible : Visibility.Collapsed;
         PrevPageButton.IsEnabled = _page > 1;
         PageLabel.Text = $"第 {_page} 页";
     }
 
-    private void OnModeToggleChecked(object sender, RoutedEventArgs e)
+    private void OnModeToggleClick(object sender, RoutedEventArgs e)
     {
         if (_restoringState)
         {
             return;
         }
 
-        _pagedMode = true;
-        _settings.GallerySubmode = "paged";
-        _settingsStore.Save(_settings);
-        _page = 1;
-        UpdateModeControls();
-        _ = RequestReload();
-    }
-
-    private void OnModeToggleUnchecked(object sender, RoutedEventArgs e)
-    {
-        if (_restoringState)
-        {
-            return;
-        }
-
-        _pagedMode = false;
-        _settings.GallerySubmode = "random";
+        _pagedMode = ModeToggle.IsChecked == true;
+        _settings.GallerySubmode = _pagedMode ? "paged" : "random";
         _settingsStore.Save(_settings);
         _page = 1;
         UpdateModeControls();
@@ -178,23 +165,16 @@ public sealed partial class GalleryPage : Page, IModePage
 
     private void OnRetry(object sender, RoutedEventArgs e) => _ = RequestReload();
 
-    /// <summary>请求一次重载：递增代际 token 使在途请求的结果作废，避免竞态。</summary>
-    private Task RequestReload()
-    {
-        _reloadToken++;
-        return ReloadAsync();
-    }
-
-    private void OnAutoReloadToggled(object sender, RoutedEventArgs e)
+    private void OnAutoReloadClick(object sender, RoutedEventArgs e)
     {
         if (_restoringState)
         {
             return;
         }
 
-        _settings.AutoReloadEnabled = AutoReloadSwitch.IsOn;
+        _settings.AutoReloadEnabled = AutoReloadToggle.IsChecked == true;
         _settingsStore.Save(_settings);
-        if (AutoReloadSwitch.IsOn)
+        if (_settings.AutoReloadEnabled)
         {
             StartAutoReload();
         }
@@ -202,6 +182,12 @@ public sealed partial class GalleryPage : Page, IModePage
         {
             StopAutoReload();
         }
+    }
+
+    private Task RequestReload()
+    {
+        _reloadToken++;
+        return ReloadAsync();
     }
 
     private void StartAutoReload()
@@ -248,7 +234,6 @@ public sealed partial class GalleryPage : Page, IModePage
                 items = await _currentSource.GetImagesAsync(_nsfwMode, _galleryCount);
             }
 
-            // 期间用户已切换源/模式/页码：丢弃过期结果，交给挂起重载。
             if (token != _reloadToken)
             {
                 return;
@@ -258,7 +243,9 @@ public sealed partial class GalleryPage : Page, IModePage
             PopulateGrid();
             if (items.Count == 0)
             {
-                StatusText.Text = "没有找到图片。可尝试更换图源、切换 NSFW 模式或调整图源标签。";
+                StatusText.Text = string.IsNullOrEmpty(_currentSource.LastError)
+                    ? "没有找到图片。可尝试更换图源、切换 NSFW 模式或调整图源标签。"
+                    : $"加载失败：{_currentSource.LastError}";
                 RetryButton.Visibility = Visibility.Visible;
             }
             else
@@ -285,7 +272,7 @@ public sealed partial class GalleryPage : Page, IModePage
                 _pendingReload = false;
                 _ = RequestReload();
             }
-            else if (AutoReloadSwitch.IsOn && IsLoaded)
+            else if (AutoReloadToggle.IsChecked == true && IsLoaded)
             {
                 StartAutoReload();
             }
@@ -298,24 +285,137 @@ public sealed partial class GalleryPage : Page, IModePage
         var downloader = _owner?.Downloader;
         foreach (var item in _items)
         {
-            var card = new ImageCard();
-            // 先注入 Downloader 再设 Item：Item 的 DP 回调会立即触发加载，
-            // 若 Downloader 尚未就绪则由其变更回调补加载（双保险）。
-            card.Downloader = downloader;
-            card.Item = item;
+            var card = new Controls.ImageCard
+            {
+                Downloader = downloader,
+                ThumbnailProxyTemplate = _settings.ThumbnailProxyTemplate,
+                Item = item,
+            };
             ThumbGrid.Items.Add(card);
         }
     }
 
-    private void OnThumbClick(object sender, ItemClickEventArgs e)
+    private void OnGridSizeChanged(object sender, SizeChangedEventArgs e)
     {
-        if (e.ClickedItem is not ImageCard card || card.Item is null || _owner is null)
+        UpdateGridLayout();
+    }
+
+    /// <summary>Recomputes square item size so the grid fills the window with 2-8 columns.</summary>
+    private void UpdateGridLayout()
+    {
+        if (ThumbGrid.ItemsPanelRoot is not ItemsWrapGrid panel)
         {
             return;
         }
 
-        var index = _items.ToList().IndexOf(card.Item);
-        var viewer = new Controls.GalleryViewerWindow(_owner, _items, index);
+        var width = ThumbGrid.ActualWidth;
+        if (width <= 0)
+        {
+            return;
+        }
+
+        var columns = Math.Clamp((int)Math.Round(width / 190), 2, 8);
+        var itemSize = Math.Clamp(
+            (width - ItemSpacing * (columns - 1)) / columns,
+            MinItemSize,
+            MaxItemSize);
+        panel.ItemWidth = itemSize;
+        panel.ItemHeight = itemSize;
+    }
+
+    private void OnThumbClick(object sender, ItemClickEventArgs e)
+    {
+        var owner = _owner;
+        if (e.ClickedItem is not Controls.ImageCard card || card.Item is null || owner is null)
+        {
+            return;
+        }
+
+        var index = 0;
+        for (var i = 0; i < _items.Count; i++)
+        {
+            if (ReferenceEquals(_items[i], card.Item))
+            {
+                index = i;
+                break;
+            }
+        }
+
+        owner.SetHeaderThumbnail(card.Item);
+        var viewer = new Controls.GalleryViewerWindow(owner, _items, index);
         viewer.Activate();
+    }
+
+    // ---------------- Batch download ----------------
+
+    private async void OnDownloadAll(object sender, RoutedEventArgs e)
+    {
+        if (_owner is null || _items.Count == 0)
+        {
+            return;
+        }
+
+        var picker = new FolderPicker();
+        WinRT.Interop.InitializeWithWindow.Initialize(
+            picker,
+            WinRT.Interop.WindowNative.GetWindowHandle(_owner));
+        picker.SuggestedStartLocation = PickerLocationId.Downloads;
+        picker.FileTypeFilter.Add("*");
+        var folder = await picker.PickSingleFolderAsync();
+        if (folder is null)
+        {
+            return;
+        }
+
+        var directory = folder.Path;
+        _settings.DownloadDirectory = directory;
+        _settingsStore.Save(_settings);
+        await RunBatchAsync(directory);
+    }
+
+    private async Task RunBatchAsync(string directory)
+    {
+        _batchCts = new CancellationTokenSource();
+        var token = _batchCts.Token;
+        DownloadAllButton.IsEnabled = false;
+        CancelBatchButton.Visibility = Visibility.Visible;
+        BatchProgress.Visibility = Visibility.Visible;
+        BatchProgress.Value = 0;
+        StatusText.Text = "准备下载…";
+
+        var progress = new Progress<BatchDownloadProgress>(p =>
+        {
+            BatchProgress.Value = p.Total > 0 ? (double)p.Completed / p.Total : 0;
+            StatusText.Text = $"下载中 {p.Completed}/{p.Total}";
+        });
+
+        try
+        {
+            var result = await _owner!.Batch.DownloadAllAsync(_items, directory, progress, token);
+            StatusText.Text = result.Failed == 0
+                ? $"已保存 {result.Succeeded} 张到 {directory}"
+                : $"完成：成功 {result.Succeeded}，失败 {result.Failed}";
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText.Text = "已取消批量下载";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"批量下载失败：{ex.Message}";
+        }
+        finally
+        {
+            _batchCts?.Dispose();
+            _batchCts = null;
+            DownloadAllButton.IsEnabled = true;
+            CancelBatchButton.Visibility = Visibility.Collapsed;
+            BatchProgress.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void OnCancelBatch(object sender, RoutedEventArgs e)
+    {
+        _batchCts?.Cancel();
     }
 }

@@ -35,6 +35,26 @@ public class SettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public void Constructor_UsesEnvironmentOverride()
+    {
+        const string envKey = "ANIMEDOWNLOADER_CONFIG_DIR";
+        var previous = Environment.GetEnvironmentVariable(envKey);
+        try
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "AnimeDownloaderEnvTest", Guid.NewGuid().ToString("N"));
+            Environment.SetEnvironmentVariable(envKey, dir);
+
+            var store = new SettingsStore();
+
+            Assert.Equal(dir, store.ConfigDirectory);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(envKey, previous);
+        }
+    }
+
+    [Fact]
     public void SaveThenLoad_RoundTripsValues()
     {
         var store = new SettingsStore(_tempDir);
@@ -45,6 +65,11 @@ public class SettingsStoreTests : IDisposable
         settings.GalleryCount = 24;
         settings.SelectedSource = "danbooru";
         settings.SourceTags["danbooru"] = "cat_ears solo";
+        settings.DownloadDirectory = @"C:\anime-downloads";
+        settings.MaxConcurrentDownloads = 6;
+        settings.EnableThumbnailCache = false;
+        settings.RequestTimeoutSeconds = 45;
+        settings.ThumbnailProxyTemplate = "https://images.weserv.nl/?url={url}&w=480";
 
         store.Save(settings);
 
@@ -55,6 +80,11 @@ public class SettingsStoreTests : IDisposable
         Assert.Equal(24, reloaded.GalleryCount);
         Assert.Equal("danbooru", reloaded.SelectedSource);
         Assert.Equal("cat_ears solo", reloaded.SourceTags["danbooru"]);
+        Assert.Equal(@"C:\anime-downloads", reloaded.DownloadDirectory);
+        Assert.Equal(6, reloaded.MaxConcurrentDownloads);
+        Assert.False(reloaded.EnableThumbnailCache);
+        Assert.Equal(45, reloaded.RequestTimeoutSeconds);
+        Assert.Equal("https://images.weserv.nl/?url={url}&w=480", reloaded.ThumbnailProxyTemplate);
     }
 
     [Fact]

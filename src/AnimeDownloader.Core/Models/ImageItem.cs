@@ -20,6 +20,19 @@ public sealed record ImageItem(
     IReadOnlyDictionary<string, object?>? Metadata = null)
 {
     /// <summary>
+    /// Builds a suggested file name (without directory), preferring the source id and a known
+    /// extension, falling back to a timestamp plus "png" when nothing can be inferred.
+    /// </summary>
+    public string SuggestFileName()
+    {
+        var baseName = string.IsNullOrWhiteSpace(Id)
+            ? $"image_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}"
+            : Id;
+        var ext = Extension ?? InferExtensionFromUrl() ?? "png";
+        return $"{baseName}.{ext}";
+    }
+
+    /// <summary>
     /// 从 URL 末尾推断扩展名（去掉查询串），无法推断时返回 null。
     /// </summary>
     public string? InferExtensionFromUrl()

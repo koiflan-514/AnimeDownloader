@@ -8,7 +8,7 @@ namespace AnimeDownloader.Core.Services;
 /// </summary>
 public sealed class HttpClientFactory
 {
-    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(20);
+    private const string UserAgent = "AnimeDownloader/0.2";
 
     private readonly AppSettings _settings;
     private readonly HttpMessageHandler? _handlerOverride;
@@ -23,11 +23,13 @@ public sealed class HttpClientFactory
     public HttpClient CreateClient()
     {
         var handler = _handlerOverride ?? BuildHandler();
+        var timeoutSeconds = Math.Clamp(_settings.RequestTimeoutSeconds, 5, 120);
         var client = new HttpClient(handler, disposeHandler: _handlerOverride is null)
         {
-            Timeout = DefaultTimeout,
+            Timeout = TimeSpan.FromSeconds(timeoutSeconds),
         };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("AnimeDownloader/0.1");
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
+        client.DefaultRequestHeaders.Accept.ParseAdd("application/json, image/avif, image/webp, image/*;q=0.9, */*;q=0.8");
         return client;
     }
 

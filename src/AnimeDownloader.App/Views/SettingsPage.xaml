@@ -4,10 +4,9 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Padding="24,12" Spacing="16" MaxWidth="720" HorizontalAlignment="Left">
+        <StackPanel Padding="16,8,16,12" Spacing="16" MaxWidth="760" HorizontalAlignment="Left">
             <TextBlock Text="设置" Style="{StaticResource TitleTextBlockStyle}" />
 
-            <!-- 通用 -->
             <Expander Header="通用" IsExpanded="True">
                 <StackPanel Spacing="8" Padding="0,8">
                     <ComboBox x:Name="NsfwCombo" Header="NSFW 过滤" Width="240">
@@ -20,27 +19,84 @@
                         <ComboBoxItem Content="浅色" Tag="light" />
                         <ComboBoxItem Content="深色" Tag="dark" />
                     </ComboBox>
-                    <NumberBox x:Name="IntervalBox" Header="自动刷新间隔（秒）" Minimum="1" Value="30" SpinButtonPlacementMode="Compact" Width="240" />
-                    <NumberBox x:Name="CountBox" Header="画廊每页数量" Minimum="1" Value="12" SpinButtonPlacementMode="Compact" Width="240" />
+                    <NumberBox x:Name="IntervalBox" Header="自动刷新间隔（秒）" Minimum="1" Value="30"
+                               SpinButtonPlacementMode="Compact" Width="240" />
+                    <NumberBox x:Name="CountBox" Header="画廊每页数量" Minimum="1" Maximum="48"
+                               Value="12" SpinButtonPlacementMode="Compact" Width="240" />
                     <CheckBox x:Name="AutoReloadCheck" Content="启用自动刷新" />
                 </StackPanel>
             </Expander>
 
-            <!-- 代理 -->
-            <Expander Header="网络与代理">
+            <Expander Header="网络与代理" IsExpanded="True">
                 <StackPanel Spacing="8" Padding="0,8">
-                    <TextBox x:Name="ProxyBox" Header="手动代理地址（留空则自动检测系统代理）" PlaceholderText="http://127.0.0.1:7890" Width="400" />
+                    <TextBox x:Name="ProxyBox" Header="手动代理地址（留空则自动检测系统代理）"
+                             PlaceholderText="http://127.0.0.1:7890" Width="400" />
                     <CheckBox x:Name="NoProxyCheck" Content="不使用代理（直连）" />
+                    <NumberBox x:Name="TimeoutBox" Header="请求超时（秒）" Minimum="5" Maximum="120"
+                               Value="20" SpinButtonPlacementMode="Compact" Width="240" />
                 </StackPanel>
             </Expander>
 
-            <!-- 图源标签 -->
+            <Expander Header="下载" IsExpanded="True">
+                <StackPanel Spacing="8" Padding="0,8">
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="DownloadDirBox" Grid.Column="0" Header="批量下载目录"
+                                 PlaceholderText="选择保存图片的文件夹" />
+                        <Button x:Name="BrowseDirButton" Grid.Column="1" Content="浏览…"
+                                VerticalAlignment="Bottom" Click="OnBrowseDir" />
+                    </Grid>
+                    <NumberBox x:Name="ConcurrencyBox" Header="最大并发下载数" Minimum="1" Maximum="16"
+                               Value="4" SpinButtonPlacementMode="Compact" Width="240" />
+                    <ToggleSwitch x:Name="CacheToggle" Header="启用缩略图缓存（内存 + 磁盘）" />
+                    <TextBox x:Name="ProxyTemplateBox" Width="400">
+                        <TextBox.Header>缩略图代理模板（可选，含 {url} 占位）</TextBox.Header>
+                        <TextBox.PlaceholderText>https://images.weserv.nl/?url={url}&amp;w=480&amp;h=480&amp;fit=cover&amp;output=jpg</TextBox.PlaceholderText>
+                    </TextBox>
+                    <Button x:Name="ClearCacheButton" Content="清除缩略图缓存" Click="OnClearCache" />
+                </StackPanel>
+            </Expander>
+
+            <Expander Header="网络检测（哪些源需要科学上网）" IsExpanded="True">
+                <StackPanel Spacing="8" Padding="0,8">
+                    <TextBlock Text="分别以“直连”和“当前代理设置”探测各图源端点，判断是否需要代理。"
+                               Style="{StaticResource AppCaptionTextStyle}" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="ProbeButton" Content="检测源连通性" Click="OnProbeConnectivity" />
+                        <ProgressRing x:Name="ProbeRing" Width="20" Height="20" IsActive="False" />
+                    </StackPanel>
+                    <ItemsControl x:Name="ProbeResults">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnSpacing="8" Margin="0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding StatusIcon}" FontSize="14" Grid.Column="0" />
+                                    <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" Grid.Column="1" />
+                                    <TextBlock Text="{Binding StatusText}" Grid.Column="2"
+                                               Style="{StaticResource AppCaptionTextStyle}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Expander>
+
             <Expander x:Name="TagsExpander" Header="图源标签">
                 <StackPanel x:Name="TagsPanel" Spacing="8" Padding="0,8" />
             </Expander>
 
+            <InfoBar x:Name="WarningBar" IsOpen="False" Severity="Warning" IsClosable="True" />
+
             <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button x:Name="SaveButton" Content="保存设置" Style="{StaticResource AccentButtonStyle}" Click="OnSave" />
+                <Button x:Name="SaveButton" Content="保存设置" Style="{StaticResource AccentButtonStyle}"
+                        Click="OnSave" />
                 <Button x:Name="ResetButton" Content="恢复默认" Click="OnReset" />
             </StackPanel>
             <TextBlock x:Name="StatusText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />

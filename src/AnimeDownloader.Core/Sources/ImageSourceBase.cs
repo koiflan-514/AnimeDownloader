@@ -37,6 +37,16 @@ public abstract class ImageSourceBase : IImageSource
     /// <inheritdoc />
     public string Tags { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Most recent diagnostic message from the last failed request (HTTP status or JSON parse
+    /// failure). Null when the last request succeeded. UI can surface this to avoid misleading
+    /// "no images found" messages.
+    /// </summary>
+    public string? LastError { get; protected set; }
+
+    /// <inheritdoc />
+    public virtual string? ProbeUrl => null;
+
     /// <inheritdoc />
     public abstract Task<ImageItem?> GetRandomImageAsync(
         NsfwMode mode,
@@ -79,16 +89,20 @@ public abstract class ImageSourceBase : IImageSource
         using var response = await Http.GetAsync(requestUrl, cancellationToken).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
         {
+            LastError = $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}";
             return null;
         }
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            return await JsonNode.ParseAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
+            var node = await JsonNode.ParseAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
+            LastError = null;
+            return node;
         }
         catch (JsonException)
         {
+            LastError = "Response was not valid JSON.";
             return null;
         }
     }

@@ -2,12 +2,14 @@ using AnimeDownloader.Core.Services;
 using AnimeDownloader.Core.Sources;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.Storage.Pickers;
 
 namespace AnimeDownloader.App.Views;
 
 /// <summary>
-/// 设置页：NSFW 过滤、主题、自动刷新间隔、画廊数量、代理与各图源标签。
-/// 保存后调用主窗口的 ApplySettings 让变更立即生效。
+/// Settings page: NSFW filter, theme, reload interval, gallery count, proxy/timeout,
+/// download directory, concurrency, thumbnail cache and per-source tags. Saving applies
+/// immediately through <see cref="MainWindow.ApplySettings"/>.
 /// </summary>
 public sealed partial class SettingsPage : Page, IModePage
 {
@@ -17,6 +19,8 @@ public sealed partial class SettingsPage : Page, IModePage
     private IReadOnlyList<IImageSource> _sources = Array.Empty<IImageSource>();
     private readonly Dictionary<string, TextBox> _tagBoxes = new();
 
+    private sealed record ProbeRow(string StatusIcon, string DisplayName, string StatusText);
+
     public SettingsPage()
     {
         InitializeComponent();
@@ -24,7 +28,6 @@ public sealed partial class SettingsPage : Page, IModePage
 
     // ---------------- IModePage ----------------
 
-    /// <summary>绑定主窗口共享状态并刷新控件（替代原 OnNavigatedTo）。</summary>
     public void Attach(MainWindow owner)
     {
         _owner = owner;
@@ -32,7 +35,6 @@ public sealed partial class SettingsPage : Page, IModePage
         _settings = owner.Settings;
         _sources = owner.Sources;
 
-        // 通用
         NsfwCombo.SelectedIndex = _settings.NsfwMode switch
         {
             NsfwModeStorage.OnlyNsfw => 1,
@@ -48,12 +50,15 @@ public sealed partial class SettingsPage : Page, IModePage
         IntervalBox.Value = _settings.AutoReloadIntervalSeconds;
         CountBox.Value = _settings.GalleryCount;
         AutoReloadCheck.IsChecked = _settings.AutoReloadEnabled;
-
-        // 代理
         ProxyBox.Text = _settings.ProxyUrl ?? string.Empty;
         NoProxyCheck.IsChecked = _settings.UseNoProxy;
+        TimeoutBox.Value = _settings.RequestTimeoutSeconds;
+        DownloadDirBox.Text = _settings.DownloadDirectory ?? string.Empty;
+        ConcurrencyBox.Value = Math.Clamp(_settings.MaxConcurrentDownloads, 1, 16);
+        CacheToggle.IsOn = _settings.EnableThumbnailCache;
+        ProxyTemplateBox.Text = _settings.ThumbnailProxyTemplate ?? string.Empty;
+        WarningBar.IsOpen = false;
 
-        // 图源标签
         TagsPanel.Children.Clear();
         _tagBoxes.Clear();
         foreach (var source in _sources.Where(s => s.SupportsTags))
@@ -75,19 +80,100 @@ public sealed partial class SettingsPage : Page, IModePage
         }
     }
 
-    /// <summary>设置页不参与浏览模式的重载。</summary>
     public void OnSourceChanged()
     {
     }
 
-    /// <summary>设置页不参与浏览模式的重载。</summary>
     public void OnNsfwChanged()
     {
     }
 
-    /// <summary>刷新按钮在设置页时无操作（安全）。</summary>
     public void Reload()
     {
+    }
+
+    private void OnBrowseDir(object sender, RoutedEventArgs e)
+    {
+        if (_owner is null)
+        {
+            return;
+        }
+
+        var picker = new FolderPicker();
+        WinRT.Interop.InitializeWithWindow.Initialize(
+            picker,
+            WinRT.Interop.WindowNative.GetWindowHandle(_owner));
+        picker.SuggestedStartLocation = PickerLocationId.Downloads;
+        picker.FileTypeFilter.Add("*");
+        _ = PickFolderAsync(picker);
+    }
+
+    private async System.Threading.Tasks.Task PickFolderAsync(FolderPicker picker)
+    {
+        var folder = await picker.PickSingleFolderAsync();
+        if (folder is not null)
+        {
+            DownloadDirBox.Text = folder.Path;
+        }
+    }
+
+    private void OnClearCache(object sender, RoutedEventArgs e)
+    {
+        _owner?.Downloader.ClearThumbnailCache();
+        StatusText.Text = "已清除缩略图缓存";
+    }
+
+    private async void OnProbeConnectivity(object sender, RoutedEventArgs e)
+    {
+        if (_owner is null)
+        {
+            return;
+        }
+
+        ProbeButton.IsEnabled = false;
+        ProbeRing.IsActive = true;
+        ProbeResults.Items.Clear();
+        StatusText.Text = "正在检测…";
+        try
+        {
+            var directSettings = new AppSettings
+            {
+                UseNoProxy = true,
+                RequestTimeoutSeconds = 8,
+            };
+            var proxiedSettings = new AppSettings
+            {
+                UseNoProxy = _settings?.UseNoProxy ?? false,
+                ProxyUrl = _settings?.ProxyUrl,
+                RequestTimeoutSeconds = 8,
+            };
+
+            using var directHttp = new HttpClientFactory(directSettings).CreateClient();
+            using var proxiedHttp = new HttpClientFactory(proxiedSettings).CreateClient();
+            var results = await ConnectivityProbe.ProbeAsync(_owner.Sources, directHttp, proxiedHttp);
+
+            foreach (var result in results)
+            {
+                ProbeResults.Items.Add(result switch
+                {
+                    { NeedsProxy: true } => new ProbeRow("🔒", result.DisplayName, "需代理（直连不可达，代理可达）"),
+                    { Unreachable: true } => new ProbeRow("✗", result.DisplayName,
+                        $"不可达（直连 {result.DirectDetail}；代理 {result.ProxyDetail}）"),
+                    _ => new ProbeRow("✓", result.DisplayName, $"直连可用（{result.DirectDetail}）"),
+                });
+            }
+
+            StatusText.Text = $"检测完成，共 {results.Count} 个源";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"检测失败：{ex.Message}";
+        }
+        finally
+        {
+            ProbeButton.IsEnabled = true;
+            ProbeRing.IsActive = false;
+        }
     }
 
     private void OnSave(object sender, RoutedEventArgs e)
@@ -109,16 +195,32 @@ public sealed partial class SettingsPage : Page, IModePage
         _settings.AutoReloadEnabled = AutoReloadCheck.IsChecked == true;
         _settings.ProxyUrl = string.IsNullOrWhiteSpace(ProxyBox.Text) ? null : ProxyBox.Text.Trim();
         _settings.UseNoProxy = NoProxyCheck.IsChecked == true;
+        _settings.RequestTimeoutSeconds = (int)TimeoutBox.Value;
+        _settings.DownloadDirectory = string.IsNullOrWhiteSpace(DownloadDirBox.Text)
+            ? null
+            : DownloadDirBox.Text.Trim();
+        _settings.MaxConcurrentDownloads = (int)ConcurrencyBox.Value;
+        _settings.EnableThumbnailCache = CacheToggle.IsOn;
+        _settings.ThumbnailProxyTemplate = string.IsNullOrWhiteSpace(ProxyTemplateBox.Text)
+            ? null
+            : ProxyTemplateBox.Text.Trim();
 
+        var forbidden = false;
         foreach (var (sourceId, box) in _tagBoxes)
         {
             _settings.SourceTags[sourceId] = box.Text.Trim();
+            if (sourceId == "danbooru" && DanbooruSource.ContainsForbiddenTag(box.Text))
+            {
+                forbidden = true;
+            }
         }
 
         _store.Save(_settings);
         _owner.ApplySettings();
-        // ApplySettings 重新 Load 出新实例：跟进共享引用，避免后续用旧实例覆盖
         _settings = _owner.Settings;
+        WarningBar.Title = "标签包含受限词（loli / shota），已自动过滤";
+        WarningBar.Message = "这些标签不会被发送到 Danbooru，其他标签保留。";
+        WarningBar.IsOpen = forbidden;
         StatusText.Text = "设置已保存";
     }
 
@@ -129,17 +231,16 @@ public sealed partial class SettingsPage : Page, IModePage
             return;
         }
 
-        // 直接覆盖为默认并重载页面状态
         var fresh = new AppSettings();
         _store.Save(fresh);
         _settings = fresh;
         _owner.ApplySettings();
         _settings = _owner.Settings;
         ReloadControls();
+        WarningBar.IsOpen = false;
         StatusText.Text = "已恢复默认设置";
     }
 
-    /// <summary>将控件值重置为当前 _settings 的内容。</summary>
     private void ReloadControls()
     {
         if (_settings is null || _store is null)
@@ -164,6 +265,11 @@ public sealed partial class SettingsPage : Page, IModePage
         AutoReloadCheck.IsChecked = _settings.AutoReloadEnabled;
         ProxyBox.Text = _settings.ProxyUrl ?? string.Empty;
         NoProxyCheck.IsChecked = _settings.UseNoProxy;
+        TimeoutBox.Value = _settings.RequestTimeoutSeconds;
+        DownloadDirBox.Text = _settings.DownloadDirectory ?? string.Empty;
+        ConcurrencyBox.Value = Math.Clamp(_settings.MaxConcurrentDownloads, 1, 16);
+        CacheToggle.IsOn = _settings.EnableThumbnailCache;
+        ProxyTemplateBox.Text = _settings.ThumbnailProxyTemplate ?? string.Empty;
         foreach (var (sourceId, box) in _tagBoxes)
         {
             box.Text = SettingsStore.GetSourceTags(_settings, sourceId);

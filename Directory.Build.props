@@ -7,7 +7,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <Deterministic>true</Deterministic>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Authors>AnimeDownloader contributors</Authors>
     <Product>AnimeDownloader</Product>
     <Copyright>(c) 2026 AnimeDownloader contributors</Copyright>

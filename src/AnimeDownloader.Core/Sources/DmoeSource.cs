@@ -19,6 +19,9 @@ public sealed class DmoeSource : ImageSourceBase
     public override string Description => "Random anime images from dmoe.cc (accessible in China).";
 
     /// <inheritdoc />
+    public override string? ProbeUrl => Endpoint;
+
+    /// <inheritdoc />
     public override async Task<ImageItem?> GetRandomImageAsync(
         NsfwMode mode,
         CancellationToken cancellationToken = default)

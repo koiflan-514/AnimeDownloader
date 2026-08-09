@@ -35,6 +35,25 @@ public sealed class AppSettings
 
     /// <summary>应用主题：default（跟随系统）/ light / dark。</summary>
     public string Theme { get; set; } = "default";
+
+    /// <summary>Default directory used for batch downloads (last used).</summary>
+    public string? DownloadDirectory { get; set; }
+
+    /// <summary>Maximum concurrent downloads shared by gallery thumbnails and batch saves.</summary>
+    public int MaxConcurrentDownloads { get; set; } = 4;
+
+    /// <summary>Whether the thumbnail cache (memory LRU + disk) is enabled.</summary>
+    public bool EnableThumbnailCache { get; set; } = true;
+
+    /// <summary>HTTP request timeout in seconds.</summary>
+    public int RequestTimeoutSeconds { get; set; } = 20;
+
+    /// <summary>
+    /// Optional thumbnail proxy template (e.g. a resize service) containing "{url}".
+    /// When empty, sources without native thumbnails fall back to the original URL
+    /// and the client decodes/caches a small version.
+    /// </summary>
+    public string? ThumbnailProxyTemplate { get; set; }
 }
 
 /// <summary>
@@ -86,6 +105,7 @@ public sealed class SettingsStore
     public SettingsStore(string? configDirectory = null)
     {
         _configDirectory = configDirectory
+            ?? Environment.GetEnvironmentVariable("ANIMEDOWNLOADER_CONFIG_DIR")
             ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "AnimeDownloader");

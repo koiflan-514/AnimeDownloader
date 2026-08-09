@@ -4,22 +4,26 @@ using AnimeDownloader.Core.Services;
 using AnimeDownloader.Core.Sources;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace AnimeDownloader.App;
 
 /// <summary>
-/// 主窗口：持有应用级共享状态（设置、图源、HttpClient、当前选中的图源与 NSFW 模式），
-/// 通过 NavigationView 在画廊 / 查看器 / 设置三页间切换。
-/// 全局工具栏（图源 / NSFW / 刷新）供两种浏览模式共享；页面通过
-/// <see cref="IModePage"/> 订阅源变更并立即重载。
+/// Main window: owns app-wide shared state (settings, sources, HttpClient, selected source and
+/// NSFW mode) and switches between the gallery / viewer / settings pages. The global toolbar
+/// (source, NSFW filter, refresh, status) lives in the left navigation pane; pages react to
+/// changes through <see cref="IModePage"/>.
 /// </summary>
+#pragma warning disable CA1001 // Owned for the application lifetime and disposed on rebuild.
 public sealed partial class MainWindow : Window
 {
+#pragma warning restore CA1001
     private readonly SettingsStore _settingsStore;
     private AppSettings _settings = null!;
     private HttpClient _http = null!;
     private IReadOnlyList<IImageSource> _sources = null!;
     private ImageDownloader _downloader = null!;
+    private BatchDownloader _batchDownloader = null!;
 
     private readonly Dictionary<string, Page> _pageCache = new(StringComparer.Ordinal);
     private Page? _currentPage;
@@ -27,6 +31,7 @@ public sealed partial class MainWindow : Window
     private IImageSource _currentSource = null!;
     private NsfwMode _currentNsfwMode = NsfwMode.BlockNsfw;
     private bool _syncingToolbar;
+    private int _headerThumbToken;
 
     public MainWindow()
     {
@@ -38,70 +43,11 @@ public sealed partial class MainWindow : Window
         Title = "AnimeDownloader";
         Root.RequestedTheme = App.ResolveTheme(App.Settings.Theme);
         SyncToolbarFromSettings();
-        ApplyWin11Chrome();
-        SetWindowIcon();
-        Root.Loaded += (_, _) => ApplyWin11Chrome();
+        Win11Chrome.SetIcon(this);
+        Win11Chrome.Apply(this, Root);
+        Root.Loaded += (_, _) => Win11Chrome.Apply(this, Root);
     }
 
-    /// <summary>设置窗口（任务栏/标题栏）图标，与 exe 图标保持一致。</summary>
-    private void SetWindowIcon()
-    {
-        var iconPath = Path.Combine(AppContext.BaseDirectory, "AnimeDownloader.ico");
-        if (!File.Exists(iconPath))
-        {
-            return;
-        }
-
-        try
-        {
-            // WinAppSDK 1.8：SetIcon(string) 接受 .ico 文件路径，运行时自行加载
-            AppWindow.SetIcon(iconPath);
-        }
-        catch (Exception)
-        {
-            // 图标设置失败不影响应用启动
-        }
-    }
-
-    /// <summary>
-    /// 应用 Win11 风格窗口外观：Mica 材质背景 + 主题自适应的标题栏按钮颜色。
-    /// Mica 需要 Win11 22000+，旧系统自动回退为普通背景。
-    /// </summary>
-    private void ApplyWin11Chrome()
-    {
-        // Mica 材质（Win11 半透明背景，标题栏不再纯白）
-        if (Microsoft.UI.Composition.SystemBackdrops.MicaController.IsSupported())
-        {
-            this.SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop();
-        }
-
-        // 标题栏按钮颜色跟随应用主题（避免系统默认的纯白/纯黑）
-        var isDark = ResolveIsDark();
-        var titleBar = AppWindow.TitleBar;
-        var fg = isDark ? Windows.UI.Color.FromArgb(255, 235, 235, 235) : Windows.UI.Color.FromArgb(255, 20, 20, 20);
-        var hover = isDark ? Windows.UI.Color.FromArgb(60, 255, 255, 255) : Windows.UI.Color.FromArgb(30, 0, 0, 0);
-        titleBar.ButtonForegroundColor = fg;
-        titleBar.ButtonHoverForegroundColor = fg;
-        titleBar.ButtonHoverBackgroundColor = hover;
-        titleBar.ButtonPressedForegroundColor = fg;
-        titleBar.ButtonPressedBackgroundColor = hover;
-        titleBar.ButtonInactiveForegroundColor = isDark ? Windows.UI.Color.FromArgb(140, 235, 235, 235) : Windows.UI.Color.FromArgb(140, 20, 20, 20);
-    }
-
-    /// <summary>按应用主题判断当前是否深色（Default 跟随系统，先按系统浅色处理，Loaded 后由 ActualTheme 校正）。</summary>
-    private bool ResolveIsDark()
-    {
-        var theme = App.ResolveTheme(App.Settings.Theme);
-        if (theme is ElementTheme.Light or ElementTheme.Dark)
-        {
-            return theme == ElementTheme.Dark;
-        }
-
-        // 跟随系统：以应用实际主题为准（窗口加载后可用）
-        return Root.ActualTheme == ElementTheme.Dark;
-    }
-
-    /// <summary>按当前设置重建 HttpClient、图源与下载器（代理/直连变更后调用）。</summary>
     private void RebuildHttp()
     {
         var settings = _settings;
@@ -113,7 +59,15 @@ public sealed partial class MainWindow : Window
         _http?.Dispose();
         _http = http;
         _sources = sources;
-        _downloader = new ImageDownloader(_http);
+        _downloader?.Dispose();
+        var cacheDir = Path.Combine(_settingsStore.ConfigDirectory, "cache", "thumbnails");
+        _downloader = new ImageDownloader(http, new ImageDownloaderOptions
+        {
+            MaxConcurrentDownloads = Math.Max(1, settings.MaxConcurrentDownloads),
+            EnableThumbnailCache = settings.EnableThumbnailCache,
+            CacheDirectory = settings.EnableThumbnailCache ? cacheDir : null,
+        });
+        _batchDownloader = new BatchDownloader(_downloader);
         _currentSource = FindSource(settings.SelectedSource);
     }
 
@@ -127,7 +81,6 @@ public sealed partial class MainWindow : Window
         _syncingToolbar = true;
         try
         {
-            // 图源下拉
             SourceCombo.Items.Clear();
             foreach (var source in _sources)
             {
@@ -143,7 +96,6 @@ public sealed partial class MainWindow : Window
                 }
             }
 
-            // NSFW 下拉
             _currentNsfwMode = _settings.NsfwMode.ToCore();
             for (var i = 0; i < NsfwCombo.Items.Count; i++)
             {
@@ -179,6 +131,20 @@ public sealed partial class MainWindow : Window
     private void OnNavigationLoaded(object sender, RoutedEventArgs e)
     {
         RootNav.SelectedItem = GalleryNavItem;
+    }
+
+    /// <summary>Expanded pane shows the full header (title + thumbnail).</summary>
+    private void OnPaneOpening(NavigationView sender, object args)
+    {
+        PaneHeaderExpanded.Visibility = Visibility.Visible;
+        PaneHeaderCompact.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>Compact pane shows a centered app icon instead of the full header.</summary>
+    private void OnPaneClosing(NavigationView sender, object args)
+    {
+        PaneHeaderExpanded.Visibility = Visibility.Collapsed;
+        PaneHeaderCompact.Visibility = Visibility.Visible;
     }
 
     private void OnNavigationSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
@@ -250,10 +216,9 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    /// <summary>当前共享设置实例（避免页面重复读盘）。</summary>
+    /// <summary>Current shared settings instance (pages read from this).</summary>
     public AppSettings Settings => _settings;
 
-    /// <summary>切换当前图源并通知各模式页面。</summary>
     public void SetCurrentSource(IImageSource source)
     {
         if (ReferenceEquals(source, _currentSource))
@@ -272,7 +237,6 @@ public sealed partial class MainWindow : Window
         (_currentPage as IModePage)?.OnSourceChanged();
     }
 
-    /// <summary>切换 NSFW 模式并通知各模式页面。</summary>
     public void SetCurrentNsfwMode(NsfwMode mode)
     {
         if (mode == _currentNsfwMode)
@@ -291,49 +255,98 @@ public sealed partial class MainWindow : Window
         (_currentPage as IModePage)?.OnNsfwChanged();
     }
 
-    /// <summary>当前全部图源实例。</summary>
     public IReadOnlyList<IImageSource> Sources => _sources;
 
-    /// <summary>当前选中的图源。</summary>
     public IImageSource CurrentSource => _currentSource;
 
-    /// <summary>当前 NSFW 模式。</summary>
     public NsfwMode CurrentNsfwMode => _currentNsfwMode;
 
-    /// <summary>图片下载器（保存 / 批量下载）。</summary>
     public ImageDownloader Downloader => _downloader;
 
-    /// <summary>设置存储。</summary>
+    /// <summary>Batch downloader for saving whole gallery pages.</summary>
+    public BatchDownloader Batch => _batchDownloader;
+
     public SettingsStore SettingsStore => _settingsStore;
 
-    /// <summary>设置页保存后调用：重载内存设置、重建网络层（代理生效）、应用主题并同步工具栏。</summary>
+    /// <summary>
+    /// Reloads settings, rebuilds the network layer (proxy/timeout/cache changes take effect),
+    /// reapplies the theme and chrome, and notifies the current page.
+    /// </summary>
     public void ApplySettings()
     {
         _settings = _settingsStore.Load();
         App.Settings = _settings;
         RebuildHttp();
         Root.RequestedTheme = App.ResolveTheme(_settings.Theme);
-        ApplyWin11Chrome();
+        Win11Chrome.Apply(this, Root);
         SyncToolbarFromSettings();
         (_currentPage as IModePage)?.OnSourceChanged();
+    }
+
+    /// <summary>
+    /// Shows a small thumbnail of the currently selected image in the sidebar header.
+    /// Only thumbnail bytes are downloaded (never the original), so this stays cheap.
+    /// </summary>
+    public void SetHeaderThumbnail(ImageItem? item)
+    {
+        var token = ++_headerThumbToken;
+        var thumbUrl = item is null
+            ? null
+            : ThumbnailResolver.ResolveThumbnailUrl(
+                item.ThumbnailUrl,
+                item.Url,
+                _settings.ThumbnailProxyTemplate);
+        if (thumbUrl is null)
+        {
+            HeaderThumb.Source = null;
+            HeaderThumbBorder.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        HeaderThumbBorder.Visibility = Visibility.Visible;
+        _ = LoadHeaderThumbAsync(thumbUrl, token);
+    }
+
+    private async Task LoadHeaderThumbAsync(string url, int token)
+    {
+        try
+        {
+            var bytes = await _downloader.DownloadCachedAsync(url);
+            if (token != _headerThumbToken)
+            {
+                return;
+            }
+
+            var bitmap = new BitmapImage
+            {
+                DecodePixelWidth = 72,
+                DecodePixelType = DecodePixelType.Logical,
+            };
+            bitmap.SetSource(new MemoryStream(bytes).AsRandomAccessStream());
+            HeaderThumb.Source = bitmap;
+        }
+        catch (Exception)
+        {
+            if (token == _headerThumbToken)
+            {
+                HeaderThumb.Source = null;
+                HeaderThumbBorder.Visibility = Visibility.Collapsed;
+            }
+        }
     }
 }
 
 /// <summary>
-/// 浏览模式页面（画廊 / 查看器）需要实现的契约：附加到主窗口、响应源与
-/// NSFW 变更、支持外部触发重载（全局刷新按钮）。
+/// Contract for browser-mode pages (gallery / viewer): attach to the main window, react to
+/// source and NSFW changes, and support external reloads (global refresh button).
 /// </summary>
 public interface IModePage
 {
-    /// <summary>绑定主窗口共享状态（导航到该页时调用）。</summary>
     void Attach(MainWindow owner);
 
-    /// <summary>当前图源变更后的响应（立即重载）。</summary>
     void OnSourceChanged();
 
-    /// <summary>NSFW 模式变更后的响应（立即重载）。</summary>
     void OnNsfwChanged();
 
-    /// <summary>按当前设置重载（全局刷新按钮）。</summary>
     void Reload();
 }

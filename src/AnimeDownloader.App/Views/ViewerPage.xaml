@@ -1,36 +1,99 @@
 <Page
     x:Class="AnimeDownloader.App.Views.ViewerPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    IsTabStop="True"
+    KeyDown="OnPageKeyDown">
 
-    <Grid Padding="16" RowSpacing="8">
+    <Grid x:Name="Root" Padding="16,8,16,12" RowSpacing="8">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- 工具条 -->
-        <StackPanel x:Name="Toolbar" Grid.Row="0" Orientation="Horizontal" Spacing="8">
-            <Button x:Name="RefreshButton" Content="换一张" Click="OnRefresh" />
-            <Button x:Name="SaveButton" Content="保存" Click="OnSave" />
-            <Button x:Name="FullscreenButton" Content="全屏" Click="OnToggleFullscreen" />
-            <TextBlock x:Name="MetaText" VerticalAlignment="Center"
-                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                       TextTrimming="CharacterEllipsis" MaxWidth="420" />
-        </StackPanel>
+        <CommandBar x:Name="Toolbar" Grid.Row="0" DefaultLabelPosition="Right">
+            <AppBarButton x:Name="RefreshButton" Label="换一张" Click="OnRefresh">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE72C;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton x:Name="SaveButton" Label="保存" Click="OnSave">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE74E;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton x:Name="FullscreenButton" Label="全屏" Click="OnToggleFullscreen">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE740;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton x:Name="FitButton" Label="适应屏幕" Click="OnFitToScreen">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE7C3;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton x:Name="ActualSizeButton" Label="实际大小" Click="OnActualSize">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE738;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton x:Name="StretchButton" Label="拉伸填充" Click="OnStretchFill">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE78F;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton x:Name="ZoomOutButton" Label="缩小" Click="OnZoomOut">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE8A2;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton x:Name="ZoomInButton" Label="放大" Click="OnZoomIn">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE8A3;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <CommandBar.Content>
+                <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <TextBlock x:Name="ZoomLabel" Text="100%" FontWeight="SemiBold"
+                               VerticalAlignment="Center" />
+                    <TextBlock x:Name="MetaText" Style="{StaticResource AppCaptionTextStyle}"
+                               MaxWidth="420" />
+                    <HyperlinkButton x:Name="SourceLinkButton" Content="打开来源"
+                                     Visibility="Collapsed" Click="OnOpenSource" />
+                </StackPanel>
+            </CommandBar.Content>
+        </CommandBar>
 
-        <!-- 大图：默认完整显示（Uniform 等比缩放到可视区域） -->
-        <Grid x:Name="ViewArea" Grid.Row="1" Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}" CornerRadius="8">
-            <Image x:Name="ViewImage" Stretch="Uniform" />
+        <Grid x:Name="ViewArea" Grid.Row="1"
+              Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
+              CornerRadius="{StaticResource PanelCornerRadius}"
+              DoubleTapped="OnViewAreaDoubleTapped">
+            <ScrollViewer x:Name="ViewScroller"
+                          ZoomMode="Enabled"
+                          MinZoomFactor="0.25"
+                          MaxZoomFactor="4"
+                          HorizontalContentAlignment="Center"
+                          VerticalContentAlignment="Center"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollMode="Enabled"
+                          VerticalScrollMode="Enabled">
+                <Image x:Name="ViewImage" Stretch="Uniform" />
+            </ScrollViewer>
             <ProgressRing x:Name="LoadingRing" Width="48" Height="48" IsActive="False" />
-            <StackPanel x:Name="ErrorPanel" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
-                <FontIcon Glyph="&#xE7BA;" FontSize="48" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <StackPanel x:Name="ErrorPanel" Visibility="Collapsed"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                <FontIcon Glyph="&#xE7BA;" FontSize="48"
+                          Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 <TextBlock x:Name="ErrorText" Text="加载失败" />
                 <Button x:Name="RetryButton" Content="重试" Click="OnRetry" />
             </StackPanel>
         </Grid>
 
-        <TextBlock Grid.Row="2" x:Name="StatusText" Text="就绪" />
+        <Border x:Name="StatusBar" Grid.Row="2" Style="{StaticResource AppStatusBarStyle}">
+            <TextBlock x:Name="StatusText" Text="就绪"
+                       Style="{StaticResource AppCaptionTextStyle}" />
+        </Border>
     </Grid>
 </Page>

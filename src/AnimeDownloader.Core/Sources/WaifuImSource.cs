@@ -21,6 +21,9 @@ public sealed class WaifuImSource : ImageSourceBase
 
     public override bool SupportsPaging => true;
 
+    /// <inheritdoc />
+    public override string? ProbeUrl => Endpoint;
+
     private static string NsfwParameter(NsfwMode mode) => mode switch
     {
         NsfwMode.ShowEverything => "All",
@@ -33,17 +36,25 @@ public sealed class WaifuImSource : ImageSourceBase
         NsfwMode mode,
         CancellationToken cancellationToken = default)
     {
-        var data = await GetJsonAsync(
-            Endpoint,
-            new Dictionary<string, string?> { ["IsNsfw"] = NsfwParameter(mode), ["PageSize"] = "1" },
-            cancellationToken).ConfigureAwait(false);
-        var item = data?["items"]?[0];
-        if (item is null)
+        for (var attempt = 0; attempt < 3; attempt++)
         {
-            return null;
+            var data = await GetJsonAsync(
+                Endpoint,
+                BuildQuery(mode, 1, Random.Shared.Next(1, 2001)),
+                cancellationToken).ConfigureAwait(false);
+            var item = data?["items"]?[0];
+            if (item is not null)
+            {
+                return BuildItem(item, data);
+            }
         }
 
-        return BuildItem(item, data);
+        var fallback = await GetJsonAsync(
+            Endpoint,
+            BuildQuery(mode, 1, 1),
+            cancellationToken).ConfigureAwait(false);
+        var fallbackItem = fallback?["items"]?[0];
+        return fallbackItem is null ? null : BuildItem(fallbackItem, fallback);
     }
 
     /// <inheritdoc />
@@ -57,18 +68,39 @@ public sealed class WaifuImSource : ImageSourceBase
             return Array.Empty<ImageItem>();
         }
 
-        var pageSize = Math.Min(count, 30);
-        var data = await GetJsonAsync(
-            Endpoint,
-            new Dictionary<string, string?>
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var data = await GetJsonAsync(
+                Endpoint,
+                BuildQuery(mode, Math.Min(count, 30), Random.Shared.Next(1, 2001)),
+                cancellationToken).ConfigureAwait(false);
+            var items = CollectItems(data, count);
+            if (items.Count > 0)
             {
-                ["IsNsfw"] = NsfwParameter(mode),
-                ["PageSize"] = pageSize.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                ["Page"] = "1",
-            },
-            cancellationToken).ConfigureAwait(false);
+                return items;
+            }
+        }
 
-        var items = new List<ImageItem>(count);
+        var fallback = await GetJsonAsync(
+            Endpoint,
+            BuildQuery(mode, Math.Min(count, 30), 1),
+            cancellationToken).ConfigureAwait(false);
+        return CollectItems(fallback, count);
+    }
+
+    private static Dictionary<string, string?> BuildQuery(NsfwMode mode, int pageSize, int page)
+    {
+        return new Dictionary<string, string?>
+        {
+            ["IsNsfw"] = NsfwParameter(mode),
+            ["PageSize"] = pageSize.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["Page"] = page.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        };
+    }
+
+    private static List<ImageItem> CollectItems(JsonNode? data, int max)
+    {
+        var items = new List<ImageItem>(max);
         foreach (var node in data?["items"]?.AsArray() ?? Enumerable.Empty<JsonNode?>())
         {
             var item = BuildItem(node, data);
@@ -77,7 +109,7 @@ public sealed class WaifuImSource : ImageSourceBase
                 items.Add(item);
             }
 
-            if (items.Count >= count)
+            if (items.Count >= max)
             {
                 break;
             }

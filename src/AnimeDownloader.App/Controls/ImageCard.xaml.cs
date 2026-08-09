@@ -1,18 +1,23 @@
 using AnimeDownloader.Core.Models;
 using AnimeDownloader.Core.Services;
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Windows.System;
 
 namespace AnimeDownloader.App.Controls;
 
 /// <summary>
-/// 缩略图卡片：异步下载图片字节并解码显示（与查看器页一致的可信路径——
-/// 未打包 WinUI3 应用中 BitmapImage 直接加载网络 URL 不可靠），
-/// 加载期间显示加载环，失败时显示占位图标。
+/// Thumbnail card: downloads image bytes asynchronously (through the shared thumbnail cache),
+/// decodes at a bounded pixel size for memory efficiency, and shows a hover scale plus an
+/// artist caption overlay.
 /// </summary>
 public sealed partial class ImageCard : UserControl
 {
+    private const int ThumbnailDecodePixelWidth = 360;
+
     public static readonly DependencyProperty ItemProperty =
         DependencyProperty.Register(
             nameof(Item),
@@ -28,20 +33,22 @@ public sealed partial class ImageCard : UserControl
             new PropertyMetadata(null, OnDownloaderChanged));
 
     private int _loadToken;
+    private bool _loading;
+
+    /// <summary>Optional resize proxy template passed through to the thumbnail resolver.</summary>
+    public string? ThumbnailProxyTemplate { get; set; }
 
     public ImageCard()
     {
         InitializeComponent();
     }
 
-    /// <summary>绑定的图片条目；设置后触发异步加载。</summary>
     public ImageItem? Item
     {
         get => (ImageItem?)GetValue(ItemProperty);
         set => SetValue(ItemProperty, value);
     }
 
-    /// <summary>共享图片下载器（由画廊页注入，避免每卡片建 HttpClient）。</summary>
     public ImageDownloader? Downloader
     {
         get => (ImageDownloader?)GetValue(DownloaderProperty);
@@ -56,15 +63,11 @@ public sealed partial class ImageCard : UserControl
     private static void OnDownloaderChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         var card = (ImageCard)d;
-        // 若 Item 已在且当前未成功显示（比如初始化时 Item 先于 Downloader 赋值，
-        // 首次加载因缺下载器走了失败占位），Downloader 就绪后重新加载。
         if (card.Item is not null && card.Thumb.Source is null && !card._loading)
         {
             card.LoadThumbnail();
         }
     }
-
-    private bool _loading;
 
     private async void LoadThumbnail()
     {
@@ -73,6 +76,7 @@ public sealed partial class ImageCard : UserControl
         LoadingRing.IsActive = true;
         ErrorOverlay.Visibility = Visibility.Collapsed;
         Thumb.Source = null;
+        ArtistOverlay.Visibility = Visibility.Collapsed;
 
         if (Item is null)
         {
@@ -81,28 +85,43 @@ public sealed partial class ImageCard : UserControl
             return;
         }
 
+        ArtistText.Text = Item.Artist ?? string.Empty;
         var downloader = Downloader;
         if (downloader is null)
         {
-            // 未注入下载器：复位加载标志并保持加载环，
-            // 等待 Downloader 就绪后由 OnDownloaderChanged 回调重新加载。
             _loading = false;
             return;
         }
 
         try
         {
-            // 画廊缩略图优先用图源缩略图地址（小得多），无缩略图时回退原图
-            var targetUrl = !string.IsNullOrEmpty(Item.ThumbnailUrl) ? Item.ThumbnailUrl : Item.Url;
-            var bytes = await downloader.DownloadAsync(targetUrl);
+            var targetUrl = ThumbnailResolver.ResolveThumbnailUrl(
+                Item.ThumbnailUrl,
+                Item.Url,
+                ThumbnailProxyTemplate);
+            if (targetUrl is null)
+            {
+                ErrorText.Text = "无缩略图";
+                ErrorOverlay.Visibility = Visibility.Visible;
+                return;
+            }
+
+            var bytes = await downloader.DownloadCachedAsync(targetUrl).ConfigureAwait(true);
             if (token != _loadToken)
             {
                 return;
             }
 
-            var bitmap = new BitmapImage();
+            var bitmap = new BitmapImage
+            {
+                DecodePixelWidth = ThumbnailDecodePixelWidth,
+                DecodePixelType = DecodePixelType.Logical,
+            };
             bitmap.SetSource(new MemoryStream(bytes).AsRandomAccessStream());
             Thumb.Source = bitmap;
+            ArtistOverlay.Visibility = string.IsNullOrEmpty(Item.Artist)
+                ? Visibility.Collapsed
+                : Visibility.Visible;
         }
         catch (Exception)
         {
@@ -111,6 +130,7 @@ public sealed partial class ImageCard : UserControl
                 return;
             }
 
+            ErrorText.Text = "加载失败";
             ErrorOverlay.Visibility = Visibility.Visible;
         }
         finally
@@ -121,5 +141,19 @@ public sealed partial class ImageCard : UserControl
                 LoadingRing.IsActive = false;
             }
         }
+    }
+
+    private void OnPointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        CardScale.ScaleX = 1.04;
+        CardScale.ScaleY = 1.04;
+        ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.Hand);
+    }
+
+    private void OnPointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        CardScale.ScaleX = 1;
+        CardScale.ScaleY = 1;
+        ProtectedCursor = null;
     }
 }

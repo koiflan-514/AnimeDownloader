@@ -19,6 +19,8 @@ public static class SourceRegistry
             new LoliconSource(http),
             new DmoeSource(http),
             new SafebooruSource(http),
+            new GelbooruSource(http),
+            new KonachanSource(http),
             new YandeReSource(http),
         };
     }

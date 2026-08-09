@@ -27,6 +27,9 @@ public sealed class DanbooruSource : ImageSourceBase
 
     public override bool SupportsTags => true;
 
+    /// <inheritdoc />
+    public override string? ProbeUrl => $"{Endpoint}/posts.json";
+
     /// <summary>判断标签串是否含受限标签（用于设置页即时反馈）。</summary>
     public static bool ContainsForbiddenTag(string? tags)
     {

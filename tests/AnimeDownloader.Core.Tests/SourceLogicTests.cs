@@ -32,6 +32,7 @@ public class SourceLogicTests
         Assert.Equal("Test Artist", item.Artist);
         Assert.Equal("https://nekos.moe/post/abc123", item.SourceLink);
         Assert.Equal("abc123", item.Id);
+        Assert.Null(item.ThumbnailUrl);
     }
 
     [Fact]
@@ -72,6 +73,7 @@ public class SourceLogicTests
         Assert.NotNull(item);
         Assert.Equal("https://example.com/a/b.png", item.Url);
         Assert.Equal("png", item.Extension);
+        Assert.Null(item.ThumbnailUrl);
     }
 
     [Fact]
@@ -103,6 +105,7 @@ public class SourceLogicTests
         Assert.NotNull(item);
         Assert.Equal("12345", item!.Id);
         Assert.Equal("Artist", item.Artist);
+        Assert.Null(item.ThumbnailUrl);
     }
 
     [Fact]
@@ -211,6 +214,136 @@ public class SourceLogicTests
 
         Assert.Contains("rating%3Asafe", query);
         Assert.Equal("YA", item?.Artist);
+    }
+
+    [Fact]
+    public async Task Konachan_BlockNsfw_AddsRatingSafe()
+    {
+        string? query = null;
+        using var http = CreateHttp(req =>
+        {
+            query = req.RequestUri!.Query;
+            return JsonResponse("""[{"id":7,"file_url":"https://konachan.com/image/a.jpg","author":"KA"}]""");
+        });
+        var source = new KonachanSource(http);
+
+        var item = await source.GetRandomImageAsync(NsfwMode.BlockNsfw);
+
+        Assert.Contains("rating%3Asafe", query);
+        Assert.Equal("KA", item?.Artist);
+        Assert.Equal("https://konachan.com/post/show/7", item?.SourceLink);
+    }
+
+    [Fact]
+    public async Task Gelbooru_ParsesPostObject()
+    {
+        using var http = CreateHttp(_ => JsonResponse(
+            """
+            {"@attributes":{"count":1},"post":[{"id":123,"file_url":"https://img.gelbooru.com/a.png","preview_url":"https://img.gelbooru.com/t.png","owner":"Owner","rating":"safe"}]}
+            """));
+        var source = new GelbooruSource(http);
+
+        var items = await source.GetImagesAsync(NsfwMode.BlockNsfw, count: 1);
+
+        var item = Assert.Single(items);
+        Assert.Equal("https://img.gelbooru.com/a.png", item.Url);
+        Assert.Equal("https://img.gelbooru.com/t.png", item.ThumbnailUrl);
+        Assert.Equal("Owner", item.Artist);
+        Assert.Equal("123", item.Id);
+        Assert.Equal("png", item.Extension);
+    }
+
+    [Fact]
+    public async Task Gelbooru_Page_IsZeroBased()
+    {
+        string? query = null;
+        using var http = CreateHttp(req =>
+        {
+            query = req.RequestUri!.Query;
+            return JsonResponse("""{"post":[]}""");
+        });
+        var source = new GelbooruSource(http);
+
+        await source.GetImagesPageAsync(NsfwMode.ShowEverything, page: 1, perPage: 12);
+
+        Assert.Contains("pid=0", query);
+        Assert.Contains("limit=12", query);
+    }
+
+    [Fact]
+    public async Task Source_SetsLastError_OnHttpFailure()
+    {
+        using var http = CreateHttp(_ => new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable));
+        var source = new NekosMoeSource(http);
+
+        var item = await source.GetRandomImageAsync(NsfwMode.BlockNsfw);
+
+        Assert.Null(item);
+        Assert.Contains("503", source.LastError);
+    }
+
+    [Fact]
+    public async Task WaifuIm_GetImages_UsesRandomPage()
+    {
+        string? query = null;
+        using var http = CreateHttp(req =>
+        {
+            query = req.RequestUri!.Query;
+            return JsonResponse("""{"items":[{"id":1,"url":"https://i.waifu.im/x.jpg"}]}""");
+        });
+        var source = new WaifuImSource(http);
+
+        await source.GetImagesAsync(NsfwMode.BlockNsfw, count: 4);
+
+        Assert.Contains("Page=", query);
+    }
+
+    [Fact]
+    public async Task Moebooru_GetImages_UsesRandomPage()
+    {
+        string? query = null;
+        using var http = CreateHttp(req =>
+        {
+            query = req.RequestUri!.Query;
+            return JsonResponse("""[{"id":1,"file_url":"https://yande.re/image/a.jpg"}]""");
+        });
+        var source = new YandeReSource(http);
+
+        await source.GetImagesAsync(NsfwMode.BlockNsfw, count: 4);
+
+        Assert.Contains("page=", query);
+    }
+
+    [Fact]
+    public async Task Safebooru_GetImages_UsesRandomPid()
+    {
+        string? query = null;
+        using var http = CreateHttp(req =>
+        {
+            query = req.RequestUri!.Query;
+            return JsonResponse("""[{"id":1,"file_url":"https://safebooru.org/a.jpg"}]""");
+        });
+        var source = new SafebooruSource(http);
+
+        await source.GetImagesAsync(NsfwMode.BlockNsfw, count: 4);
+
+        Assert.Contains("pid=", query);
+    }
+
+    [Fact]
+    public async Task Gelbooru_GetImages_UsesRandomPid()
+    {
+        string? query = null;
+        using var http = CreateHttp(req =>
+        {
+            query = req.RequestUri!.Query;
+            return JsonResponse("""{"post":[{"id":1,"file_url":"https://img.gelbooru.com/a.jpg"}]}""");
+        });
+        var source = new GelbooruSource(http);
+
+        await source.GetImagesAsync(NsfwMode.BlockNsfw, count: 4);
+
+        Assert.Contains("pid=", query);
     }
 
     [Fact]

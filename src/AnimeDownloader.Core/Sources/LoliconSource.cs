@@ -24,6 +24,9 @@ public sealed class LoliconSource : ImageSourceBase
 
     public override bool SupportsTags => true;
 
+    /// <inheritdoc />
+    public override string? ProbeUrl => Endpoint;
+
     private Dictionary<string, object?> BuildRequestBody(NsfwMode mode, int num)
     {
         var r18 = mode switch

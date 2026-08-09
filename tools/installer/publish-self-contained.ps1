@@ -8,7 +8,7 @@
       1. 前置检查：.NET SDK 与 WiX Toolset（wix）是否可用
       2. dotnet publish --self-contained true -r <arch> 生成完整发布目录
       3. dotnet build tools/installer/AnimeDownloader.wixproj 生成 .msi
-         （WixUI_FeatureTree：可自选安装目录、桌面快捷方式、开始菜单快捷方式）
+         （中文安装向导：许可协议、自定义安装目录、完成后显示卸载指引）
     产物：publish\AnimeDownloader-<version>-self-contained-<arch>.msi
 
 .PARAMETER Architecture
@@ -59,7 +59,7 @@ if (-not (Get-Command wix -ErrorAction SilentlyContinue)) {
 }
 
 # 读取版本（Directory.Build.props 的 <Version>）
-$version = "0.1.0"
+$version = "0.2.0"
 $props = Join-Path $root "Directory.Build.props"
 if (Test-Path $props) {
     $m = Select-String -Path $props -Pattern '<Version>([^<]+)</Version>'
@@ -83,6 +83,10 @@ $msiPath = Join-Path $OutputDir $msiName
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
 Write-Host "`n[2/2] 生成 $msiName ..." -ForegroundColor Yellow
+# 清理上一次打包的中间产物，避免增量构建复用旧输出
+foreach ($dir in @((Join-Path $PSScriptRoot "obj"), (Join-Path $PSScriptRoot "bin"))) {
+    if (Test-Path $dir) { Remove-Item $dir -Recurse -Force }
+}
 # wixproj 的 OutputName 已含版本/类型/架构，此处直接构建并复制到 OutputDir
 & dotnet build $wixproj `
     -c $Configuration `
@@ -93,11 +97,7 @@ Write-Host "`n[2/2] 生成 $msiName ..." -ForegroundColor Yellow
     -p:ArchShort=$archShort
 if ($LASTEXITCODE -ne 0) { throw "wix build 失败（退出码 $LASTEXITCODE）" }
 
-$builtMsi = Join-Path $PSScriptRoot "bin\$archShort\$Configuration\$msiName"
-if (-not (Test-Path $builtMsi)) {
-    # 兜底：在发布目录下搜索
-    $builtMsi = Get-ChildItem (Join-Path $PSScriptRoot "bin") -Recurse -Filter $msiName | Select-Object -First 1 -ExpandProperty FullName
-}
+$builtMsi = Get-ChildItem (Join-Path $PSScriptRoot "bin") -Recurse -Filter $msiName | Select-Object -First 1 -ExpandProperty FullName
 if (-not $builtMsi -or -not (Test-Path $builtMsi)) { throw "未找到生成的 .msi 文件" }
 Copy-Item $builtMsi $msiPath -Force
 

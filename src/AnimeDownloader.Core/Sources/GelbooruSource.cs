@@ -4,23 +4,23 @@ using AnimeDownloader.Core.Models;
 namespace AnimeDownloader.Core.Sources;
 
 /// <summary>
-/// Safebooru 图源：https://safebooru.org（仅全年龄内容，支持标签与分页；
-/// 分页参数 pid 为 0 基，对应参考项目实现）。
+/// Gelbooru source: https://gelbooru.com (Gelbooru API v1; tags, NSFW rating filter, paging).
+/// The JSON response shape is {"@attributes": {...}, "post": [...]}.
 /// </summary>
-public sealed class SafebooruSource : ImageSourceBase
+public sealed class GelbooruSource : ImageSourceBase
 {
-    private const string Endpoint = "https://safebooru.org/index.php";
+    private const string Endpoint = "https://gelbooru.com/index.php";
     private const int RandomFetchLimit = 100;
     private const int TaggedRandomMaxPid = 200;
 
-    public SafebooruSource(HttpClient http)
-        : base(http, "safebooru")
+    public GelbooruSource(HttpClient http)
+        : base(http, "gelbooru")
     {
     }
 
-    public override string DisplayName => "Safebooru";
+    public override string DisplayName => "Gelbooru";
 
-    public override string Description => "Random images from safebooru.org (safe-for-work only).";
+    public override string Description => "Random images from gelbooru.com with custom tags.";
 
     public override bool SupportsPaging => true;
 
@@ -29,7 +29,7 @@ public sealed class SafebooruSource : ImageSourceBase
     /// <inheritdoc />
     public override string? ProbeUrl => Endpoint;
 
-    private Dictionary<string, string?> BaseQuery(int? limit, int? pid)
+    private Dictionary<string, string?> BaseQuery(int? limit, int? pid, NsfwMode mode)
     {
         var query = new Dictionary<string, string?>
         {
@@ -48,10 +48,17 @@ public sealed class SafebooruSource : ImageSourceBase
             query["pid"] = pid.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
-        var tags = Tags.Trim();
-        if (tags.Length > 0)
+        var rating = mode switch
         {
-            query["tags"] = tags;
+            NsfwMode.BlockNsfw => "rating:general",
+            NsfwMode.OnlyNsfw => "rating:explicit",
+            _ => null,
+        };
+        var tags = Tags.Trim();
+        var combined = tags.Length > 0 && rating is not null ? $"{tags} {rating}" : rating ?? tags;
+        if (combined.Length > 0)
+        {
+            query["tags"] = combined;
         }
 
         return query;
@@ -66,28 +73,21 @@ public sealed class SafebooruSource : ImageSourceBase
         {
             var data = await GetJsonAsync(
                 Endpoint,
-                BaseQuery(RandomFetchLimit, NextRandomPid()),
+                BaseQuery(RandomFetchLimit, NextRandomPid(), mode),
                 cancellationToken).ConfigureAwait(false);
-            var posts = data?.AsArray();
-            if (posts is null || posts.Count == 0)
+            var posts = ReadPosts(data);
+            if (posts.Count > 0)
             {
-                continue;
+                return BuildItem(posts[Random.Shared.Next(posts.Count)], data);
             }
-
-            return BuildItem(posts[Random.Shared.Next(posts.Count)], data);
         }
 
         var fallback = await GetJsonAsync(
             Endpoint,
-            BaseQuery(RandomFetchLimit, 0),
+            BaseQuery(RandomFetchLimit, 0, mode),
             cancellationToken).ConfigureAwait(false);
-        var fallbackPosts = fallback?.AsArray();
-        if (fallbackPosts is null || fallbackPosts.Count == 0)
-        {
-            return null;
-        }
-
-        return BuildItem(fallbackPosts[Random.Shared.Next(fallbackPosts.Count)], fallback);
+        var fallbackPosts = ReadPosts(fallback);
+        return fallbackPosts.Count == 0 ? null : BuildItem(fallbackPosts[0], fallback);
     }
 
     /// <inheritdoc />
@@ -105,7 +105,7 @@ public sealed class SafebooruSource : ImageSourceBase
         {
             var data = await GetJsonAsync(
                 Endpoint,
-                BaseQuery(Math.Max(count, 1), NextRandomPid()),
+                BaseQuery(Math.Max(count, 1), NextRandomPid(), mode),
                 cancellationToken).ConfigureAwait(false);
             var items = CollectItems(data, count);
             if (items.Count > 0)
@@ -116,7 +116,7 @@ public sealed class SafebooruSource : ImageSourceBase
 
         var fallback = await GetJsonAsync(
             Endpoint,
-            BaseQuery(Math.Max(count, 1), 0),
+            BaseQuery(Math.Max(count, 1), 0, mode),
             cancellationToken).ConfigureAwait(false);
         return CollectItems(fallback, count);
     }
@@ -140,18 +140,25 @@ public sealed class SafebooruSource : ImageSourceBase
         }
 
         var pid = Math.Max(page - 1, 0);
-        var data = await GetJsonAsync(Endpoint, BaseQuery(perPage, pid), cancellationToken).ConfigureAwait(false);
+        var data = await GetJsonAsync(Endpoint, BaseQuery(perPage, pid, mode), cancellationToken)
+            .ConfigureAwait(false);
         return CollectItems(data, perPage);
     }
 
-    private static IReadOnlyList<ImageItem> CollectItems(JsonNode? data, int max)
+    private static List<JsonNode> ReadPosts(JsonNode? data)
     {
-        var posts = data?.AsArray();
+        var posts = data?["post"]?.AsArray();
         if (posts is null)
         {
-            return Array.Empty<ImageItem>();
+            return new List<JsonNode>();
         }
 
+        return posts.Where(p => p is not null).Cast<JsonNode>().ToList();
+    }
+
+    private static List<ImageItem> CollectItems(JsonNode? data, int max)
+    {
+        var posts = ReadPosts(data);
         var items = new List<ImageItem>(max);
         foreach (var post in posts)
         {
@@ -178,7 +185,7 @@ public sealed class SafebooruSource : ImageSourceBase
             return null;
         }
 
-        var id = post?["id"]?.GetValue<long>().ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var id = ReadStringValue(post?["id"]);
         var owner = post?["owner"]?.GetValue<string>();
         var extension = InferExtension(url);
         var thumbnail = post?["preview_url"]?.GetValue<string>();
@@ -187,11 +194,18 @@ public sealed class SafebooruSource : ImageSourceBase
             Url: url,
             ThumbnailUrl: string.IsNullOrEmpty(thumbnail) ? null : thumbnail,
             Artist: owner,
-            SourceLink: id is null ? null : $"https://safebooru.org/index.php?page=post&s=view&id={id}",
+            SourceLink: id is null ? null : $"https://gelbooru.com/index.php?page=post&s=view&id={id}",
             Id: id,
             Extension: extension,
             Metadata: new Dictionary<string, object?> { ["raw"] = root?.ToJsonString() });
     }
+
+    private static string? ReadStringValue(JsonNode? node) => node switch
+    {
+        null => null,
+        JsonValue value when value.TryGetValue<string>(out var s) => s,
+        _ => node?.ToString(),
+    };
 
     private static string? InferExtension(string url)
     {
