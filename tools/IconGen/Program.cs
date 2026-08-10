@@ -28,6 +28,14 @@ foreach (var size in sizes)
 File.WriteAllBytes(outputPath, BuildIco(pngEntries));
 Console.WriteLine($"Written: {Path.GetFullPath(outputPath)} ({new FileInfo(outputPath).Length} bytes)");
 
+// 同时导出 64x64 PNG，供应用界面（侧栏 logo 等）使用
+var pngPath = Path.Combine(outputDir, "AnimeDownloader.png");
+using (var pngBmp = DrawIcon(64))
+{
+    pngBmp.Save(pngPath, ImageFormat.Png);
+}
+Console.WriteLine($"Written: {Path.GetFullPath(pngPath)}");
+
 // ---------------- 绘制 ----------------
 
 static Bitmap DrawIcon(int size)

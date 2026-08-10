@@ -36,6 +36,7 @@
   <!-- 应用图标：嵌入 exe（ApplicationIcon）并复制到输出目录供窗口图标使用 -->
   <ItemGroup>
     <Content Include="..\icons\AnimeDownloader.ico" Link="AnimeDownloader.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\icons\AnimeDownloader.png" Link="AnimeDownloader.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

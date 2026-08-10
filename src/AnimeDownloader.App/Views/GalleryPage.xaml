@@ -10,41 +10,46 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <CommandBar x:Name="GalleryBar" Grid.Row="0"
-                    IsOpen="False"
-                    DefaultLabelPosition="Right">
-            <AppBarToggleButton x:Name="ModeToggle" Label="随机模式"
-                                Click="OnModeToggleClick">
-                <AppBarToggleButton.Icon>
-                    <FontIcon Glyph="&#xE8A9;" />
-                </AppBarToggleButton.Icon>
-            </AppBarToggleButton>
-            <AppBarButton x:Name="PrevPageButton" Label="上一页" Click="OnPrevPage">
-                <AppBarButton.Icon>
-                    <FontIcon Glyph="&#xE76B;" />
-                </AppBarButton.Icon>
-            </AppBarButton>
-            <AppBarButton x:Name="NextPageButton" Label="下一页" Click="OnNextPage">
-                <AppBarButton.Icon>
-                    <FontIcon Glyph="&#xE76C;" />
-                </AppBarButton.Icon>
-            </AppBarButton>
-            <AppBarButton x:Name="DownloadAllButton" Label="下载全部" Click="OnDownloadAll">
-                <AppBarButton.Icon>
-                    <FontIcon Glyph="&#xE896;" />
-                </AppBarButton.Icon>
-            </AppBarButton>
-            <AppBarToggleButton x:Name="AutoReloadToggle" Label="自动刷新"
-                                Click="OnAutoReloadClick">
-                <AppBarToggleButton.Icon>
-                    <FontIcon Glyph="&#xE72C;" />
-                </AppBarToggleButton.Icon>
-            </AppBarToggleButton>
-            <CommandBar.Content>
-                <TextBlock x:Name="PageLabel" Text="第 1 页"
-                           Style="{StaticResource AppCaptionTextStyle}" Margin="12,0" />
-            </CommandBar.Content>
-        </CommandBar>
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <CommandBar x:Name="GalleryBar" Grid.Column="0"
+                        IsOpen="False"
+                        DefaultLabelPosition="Right">
+                <AppBarToggleButton x:Name="ModeToggle" Label="随机模式"
+                                    Click="OnModeToggleClick">
+                    <AppBarToggleButton.Icon>
+                        <FontIcon Glyph="&#xE8A9;" />
+                    </AppBarToggleButton.Icon>
+                </AppBarToggleButton>
+                <AppBarButton x:Name="PrevPageButton" Label="上一页" Click="OnPrevPage">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE76B;" />
+                    </AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="NextPageButton" Label="下一页" Click="OnNextPage">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE76C;" />
+                    </AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="DownloadAllButton" Label="下载全部" Click="OnDownloadAll">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE896;" />
+                    </AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarToggleButton x:Name="AutoReloadToggle" Label="自动刷新"
+                                    Click="OnAutoReloadClick">
+                    <AppBarToggleButton.Icon>
+                        <FontIcon Glyph="&#xE72C;" />
+                    </AppBarToggleButton.Icon>
+                </AppBarToggleButton>
+            </CommandBar>
+            <TextBlock x:Name="PageLabel" Grid.Column="1" Text="第 1 页"
+                       Style="{StaticResource AppCaptionTextStyle}"
+                       VerticalAlignment="Center" Margin="12,0,0,0" />
+        </Grid>
 
         <GridView
             x:Name="ThumbGrid"

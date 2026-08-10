@@ -311,6 +311,7 @@ public sealed partial class ViewerPage : Page, IModePage
     private void HideChrome()
     {
         Toolbar.Visibility = Visibility.Collapsed;
+        ToolbarContent.Visibility = Visibility.Collapsed;
         StatusBar.Visibility = Visibility.Collapsed;
         ViewArea.CornerRadius = new CornerRadius(0);
         Root.Padding = new Thickness(0);
@@ -319,6 +320,7 @@ public sealed partial class ViewerPage : Page, IModePage
     private void ShowChrome()
     {
         Toolbar.Visibility = Visibility.Visible;
+        ToolbarContent.Visibility = Visibility.Visible;
         StatusBar.Visibility = Visibility.Visible;
         ViewArea.CornerRadius = new CornerRadius(12);
         Root.Padding = new Thickness(16, 8, 16, 12);

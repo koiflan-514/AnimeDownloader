@@ -43,6 +43,8 @@ public sealed partial class MainWindow : Window
         Title = "AnimeDownloader";
         Root.RequestedTheme = App.ResolveTheme(App.Settings.Theme);
         SyncToolbarFromSettings();
+        ApplyPaneLayout(compact: false);
+        SetLogoSource();
         Win11Chrome.SetIcon(this);
         Win11Chrome.Apply(this, Root);
         Root.Loaded += (_, _) => Win11Chrome.Apply(this, Root);
@@ -133,18 +135,52 @@ public sealed partial class MainWindow : Window
         RootNav.SelectedItem = GalleryNavItem;
     }
 
-    /// <summary>Expanded pane shows the full header (title + thumbnail).</summary>
+    /// <summary>Expanded pane shows full controls and the status bar in the footer.</summary>
     private void OnPaneOpening(NavigationView sender, object args)
     {
-        PaneHeaderExpanded.Visibility = Visibility.Visible;
-        PaneHeaderCompact.Visibility = Visibility.Collapsed;
+        ApplyPaneLayout(compact: false);
     }
 
-    /// <summary>Compact pane shows a centered app icon instead of the full header.</summary>
+    /// <summary>
+    /// Compact pane switches the controls to icon-only form: centered labels, arrow-only
+    /// combos, icon-only buttons and the app logo centered in the footer.
+    /// </summary>
     private void OnPaneClosing(NavigationView sender, object args)
     {
-        PaneHeaderExpanded.Visibility = Visibility.Collapsed;
-        PaneHeaderCompact.Visibility = Visibility.Visible;
+        ApplyPaneLayout(compact: true);
+    }
+
+    private void ApplyPaneLayout(bool compact)
+    {
+        // 收起态隐藏图源/NSFW/刷新/清理控件区，只保留导航图标与底部 logo，
+        // 与“画廊/查看器/设置”三个原生导航项保持同一视觉体系；展开态显示完整控件。
+        PaneControls.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+
+        // 底部：收起态只显示居中的应用 logo，展开态显示状态栏
+        PaneFooterExpanded.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        PaneFooterCompact.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
+        PaneFooterCompact.Width = compact ? RootNav.CompactPaneLength : double.NaN;
+    }
+
+    /// <summary>Loads the app logo PNG (copied next to the exe) for the pane headers.</summary>
+    private void SetLogoSource()
+    {
+        var logoPath = Path.Combine(AppContext.BaseDirectory, "AnimeDownloader.png");
+        if (!File.Exists(logoPath))
+        {
+            return;
+        }
+
+        try
+        {
+            var logo = new BitmapImage(new Uri(logoPath));
+            HeaderLogo.Source = logo;
+            FooterLogo.Source = logo;
+        }
+        catch (Exception)
+        {
+            // Logo failure must not break startup.
+        }
     }
 
     private void OnNavigationSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
@@ -213,6 +249,67 @@ public sealed partial class MainWindow : Window
         if (_currentPage is IModePage modePage)
         {
             modePage.Reload();
+        }
+    }
+
+    /// <summary>
+    /// Shows a Win11-style confirmation dialog before clearing the thumbnail cache,
+    /// including the current cache size and the impact of clearing it.
+    /// </summary>
+    private async void OnClearCacheClick(object sender, RoutedEventArgs e)
+    {
+        var sizeMb = GetThumbnailCacheSizeBytes() / (1024.0 * 1024.0);
+        var sizeText = sizeMb >= 1
+            ? $"{sizeMb:0.#} MB"
+            : $"{Math.Max(1, (long)(sizeMb * 1024))} KB";
+        var content = new TextBlock
+        {
+            Text = $"当前缓存约 {sizeText}（磁盘），另有少量内存缓存。\n\n" +
+                   "清理后，画廊缩略图和标题栏预览需要重新联网加载；\n" +
+                   "已保存下载的图片、图源标签和设置不会受影响。",
+            TextWrapping = TextWrapping.Wrap,
+            MaxWidth = 360,
+        };
+        var dialog = new ContentDialog
+        {
+            Title = "清理缓存",
+            Content = content,
+            PrimaryButtonText = "清理",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = Root.XamlRoot,
+        };
+
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        _downloader.ClearThumbnailCache();
+        GlobalStatusText.Text = "缓存已清理";
+    }
+
+    private long GetThumbnailCacheSizeBytes()
+    {
+        var cacheDir = Path.Combine(_settingsStore.ConfigDirectory, "cache", "thumbnails");
+        if (!Directory.Exists(cacheDir))
+        {
+            return 0;
+        }
+
+        try
+        {
+            return Directory.EnumerateFiles(cacheDir, "*.img", SearchOption.TopDirectoryOnly)
+                .Sum(file => new FileInfo(file).Length);
+        }
+        catch (IOException)
+        {
+            return 0;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return 0;
         }
     }
 

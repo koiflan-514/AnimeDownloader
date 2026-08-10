@@ -12,58 +12,65 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <CommandBar x:Name="Toolbar" Grid.Row="0" DefaultLabelPosition="Right">
-            <AppBarButton x:Name="RefreshButton" Label="换一张" Click="OnRefresh">
-                <AppBarButton.Icon>
-                    <FontIcon Glyph="&#xE72C;" />
-                </AppBarButton.Icon>
-            </AppBarButton>
-            <AppBarButton x:Name="SaveButton" Label="保存" Click="OnSave">
-                <AppBarButton.Icon>
-                    <FontIcon Glyph="&#xE74E;" />
-                </AppBarButton.Icon>
-            </AppBarButton>
-            <AppBarButton x:Name="FullscreenButton" Label="全屏" Click="OnToggleFullscreen">
-                <AppBarButton.Icon>
-                    <FontIcon Glyph="&#xE740;" />
-                </AppBarButton.Icon>
-            </AppBarButton>
-            <AppBarButton x:Name="FitButton" Label="适应屏幕" Click="OnFitToScreen">
-                <AppBarButton.Icon>
-                    <FontIcon Glyph="&#xE7C3;" />
-                </AppBarButton.Icon>
-            </AppBarButton>
-            <AppBarButton x:Name="ActualSizeButton" Label="实际大小" Click="OnActualSize">
-                <AppBarButton.Icon>
-                    <FontIcon Glyph="&#xE738;" />
-                </AppBarButton.Icon>
-            </AppBarButton>
-            <AppBarButton x:Name="StretchButton" Label="拉伸填充" Click="OnStretchFill">
-                <AppBarButton.Icon>
-                    <FontIcon Glyph="&#xE78F;" />
-                </AppBarButton.Icon>
-            </AppBarButton>
-            <AppBarButton x:Name="ZoomOutButton" Label="缩小" Click="OnZoomOut">
-                <AppBarButton.Icon>
-                    <FontIcon Glyph="&#xE8A2;" />
-                </AppBarButton.Icon>
-            </AppBarButton>
-            <AppBarButton x:Name="ZoomInButton" Label="放大" Click="OnZoomIn">
-                <AppBarButton.Icon>
-                    <FontIcon Glyph="&#xE8A3;" />
-                </AppBarButton.Icon>
-            </AppBarButton>
-            <CommandBar.Content>
-                <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                    <TextBlock x:Name="ZoomLabel" Text="100%" FontWeight="SemiBold"
-                               VerticalAlignment="Center" />
-                    <TextBlock x:Name="MetaText" Style="{StaticResource AppCaptionTextStyle}"
-                               MaxWidth="420" />
-                    <HyperlinkButton x:Name="SourceLinkButton" Content="打开来源"
-                                     Visibility="Collapsed" Click="OnOpenSource" />
-                </StackPanel>
-            </CommandBar.Content>
-        </CommandBar>
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <CommandBar x:Name="Toolbar" Grid.Column="0" DefaultLabelPosition="Right">
+                <AppBarButton x:Name="RefreshButton" Label="换一张" Click="OnRefresh">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE72C;" />
+                    </AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="SaveButton" Label="保存" Click="OnSave">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE74E;" />
+                    </AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="FullscreenButton" Label="全屏" Click="OnToggleFullscreen">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE740;" />
+                    </AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="FitButton" Label="适应屏幕" Click="OnFitToScreen">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE7C3;" />
+                    </AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="ActualSizeButton" Label="实际大小" Click="OnActualSize">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE738;" />
+                    </AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="StretchButton" Label="拉伸填充" Click="OnStretchFill">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE78F;" />
+                    </AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="ZoomOutButton" Label="缩小" Click="OnZoomOut">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE8A2;" />
+                    </AppBarButton.Icon>
+                </AppBarButton>
+                <AppBarButton x:Name="ZoomInButton" Label="放大" Click="OnZoomIn">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE8A3;" />
+                    </AppBarButton.Icon>
+                </AppBarButton>
+            </CommandBar>
+            <StackPanel x:Name="ToolbarContent" Grid.Column="1"
+                        Orientation="Horizontal" Spacing="12"
+                        VerticalAlignment="Center" Margin="12,0,0,0">
+                <TextBlock x:Name="ZoomLabel" Text="100%" FontWeight="SemiBold"
+                           VerticalAlignment="Center" />
+                <TextBlock x:Name="MetaText" Style="{StaticResource AppCaptionTextStyle}"
+                           MaxWidth="420" VerticalAlignment="Center" />
+                <HyperlinkButton x:Name="SourceLinkButton" Content="打开来源"
+                                 Visibility="Collapsed" Click="OnOpenSource"
+                                 VerticalAlignment="Center" />
+            </StackPanel>
+        </Grid>
 
         <Grid x:Name="ViewArea" Grid.Row="1"
               Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
