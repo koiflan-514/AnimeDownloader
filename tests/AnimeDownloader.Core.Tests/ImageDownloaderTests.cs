@@ -68,6 +68,28 @@ public class ImageDownloaderTests
     }
 
     [Fact]
+    public async Task DownloadCachedAsync_CoalescesConcurrentRequests()
+    {
+        var attempts = 0;
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new DelayedHandler(async cancellationToken =>
+        {
+            Interlocked.Increment(ref attempts);
+            await gate.Task.WaitAsync(cancellationToken);
+            return OkBytes(new byte[] { 4, 2 });
+        });
+        using var http = new HttpClient(handler);
+        var downloader = new ImageDownloader(http);
+
+        var first = downloader.DownloadCachedAsync("https://example.com/shared.jpg");
+        var second = downloader.DownloadCachedAsync("https://example.com/shared.jpg");
+        gate.SetResult();
+
+        await Task.WhenAll(first, second);
+        Assert.Equal(1, attempts);
+    }
+
+    [Fact]
     public async Task DownloadToFileAsync_WritesAtomically()
     {
         var dir = CreateTempDir();
@@ -155,5 +177,12 @@ public class ImageDownloaderTests
             HttpRequestMessage request,
             CancellationToken cancellationToken) =>
             Task.FromResult(responder(request));
+    }
+
+    private sealed class DelayedHandler(Func<CancellationToken, Task<HttpResponseMessage>> responder) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) => responder(cancellationToken);
     }
 }

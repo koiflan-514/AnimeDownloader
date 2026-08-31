@@ -4,40 +4,60 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="图片查看器">
 
-    <Grid x:Name="Root" KeyDown="OnWindowKeyDown">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+    <Grid x:Name="Root" KeyDown="OnWindowKeyDown"
+          Background="{ThemeResource AppViewerBackgroundBrush}">
+        <Grid x:Name="ViewHost">
+            <Image x:Name="ViewImage" Stretch="Uniform" />
+            <ProgressRing x:Name="LoadingRing" Width="40" Height="40" IsActive="False"
+                          Foreground="{ThemeResource AppAccentBrush}" />
+            <StackPanel x:Name="ErrorPanel" Visibility="Collapsed"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+                <FontIcon Glyph="&#xE7BA;" FontSize="40"
+                          Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                <TextBlock x:Name="ErrorText" Text="加载失败"
+                           Foreground="{ThemeResource AppTextPrimaryBrush}" />
+            </StackPanel>
+        </Grid>
 
-        <Grid x:Name="Toolbar" Grid.Row="0" Padding="12,8">
-            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
-                <Button x:Name="PrevButton" Content="上一张" Click="OnPrev" />
-                <TextBlock x:Name="IndexLabel" Text="1 / 1" VerticalAlignment="Center" />
-                <Button x:Name="NextButton" Content="下一张" Click="OnNext" />
-                <Border x:Name="WindowThumbBorder" Width="40" Height="40" CornerRadius="6"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+        <!-- 浮动工具栏 -->
+        <Border x:Name="Toolbar" Style="{StaticResource AppFloatingToolbarStyle}"
+                HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                Margin="0,0,0,18" Opacity="0.97">
+            <StackPanel Orientation="Horizontal" Spacing="2">
+                <Button x:Name="PrevButton" Style="{StaticResource AppIconButtonStyle}"
+                        Click="OnPrev" ToolTipService.ToolTip="上一张（←）">
+                    <FontIcon Glyph="&#xE76B;" FontSize="15" />
+                </Button>
+                <Border MinWidth="64" VerticalAlignment="Center">
+                    <TextBlock x:Name="IndexLabel" Text="1 / 1" FontSize="12.5" FontWeight="SemiBold"
+                               Foreground="{ThemeResource AppTextPrimaryBrush}"
+                               HorizontalAlignment="Center" />
+                </Border>
+                <Button x:Name="NextButton" Style="{StaticResource AppIconButtonStyle}"
+                        Click="OnNext" ToolTipService.ToolTip="下一张（→）">
+                    <FontIcon Glyph="&#xE76C;" FontSize="15" />
+                </Button>
+                <Border Width="1" Height="22" Margin="6,8" VerticalAlignment="Center"
+                        Background="{ThemeResource AppCardStrokeBrush}" />
+                <Border x:Name="WindowThumbBorder" Width="40" Height="40" CornerRadius="8"
+                        Background="{ThemeResource AppTagChipBrush}"
+                        BorderBrush="{ThemeResource AppCardStrokeBrush}"
                         BorderThickness="1"
+                        VerticalAlignment="Center" Margin="0,0,4,0"
                         Visibility="Collapsed">
                     <Image x:Name="WindowThumb" Stretch="UniformToFill" />
                 </Border>
+                <Button x:Name="SaveButton" Style="{StaticResource AppIconButtonStyle}"
+                        Click="OnSave" ToolTipService.ToolTip="保存">
+                    <FontIcon Glyph="&#xE74E;" FontSize="15" />
+                </Button>
+                <Border Width="1" Height="22" Margin="6,8" VerticalAlignment="Center"
+                        Background="{ThemeResource AppCardStrokeBrush}" />
+                <Button x:Name="FullscreenButton" Style="{StaticResource AppIconButtonStyle}"
+                        Click="OnToggleFullscreen" ToolTipService.ToolTip="全屏（F11）">
+                    <FontIcon Glyph="&#xE740;" FontSize="15" />
+                </Button>
             </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                <Button x:Name="FullscreenButton" Content="全屏" Click="OnToggleFullscreen" />
-                <Button x:Name="SaveButton" Content="保存" Click="OnSave" />
-            </StackPanel>
-        </Grid>
-
-        <Grid Grid.Row="1">
-            <Image x:Name="ViewImage" Stretch="Uniform" />
-            <ProgressRing x:Name="LoadingRing" Width="40" Height="40" IsActive="False" />
-            <StackPanel x:Name="ErrorPanel" Visibility="Collapsed"
-                        HorizontalAlignment="Center" VerticalAlignment="Center">
-                <FontIcon Glyph="&#xE7BA;" FontSize="40"
-                          Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                <TextBlock x:Name="ErrorText" Text="加载失败" Margin="0,8,0,0" />
-            </StackPanel>
-        </Grid>
+        </Border>
     </Grid>
 </Window>

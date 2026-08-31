@@ -111,6 +111,32 @@ public abstract class ImageSourceBase : IImageSource
     protected string DefaultFileName(DateTimeOffset? stamp = null) =>
         $"{Id}_{(stamp ?? DateTimeOffset.UtcNow).ToUnixTimeSeconds()}";
 
+    /// <summary>
+    /// 构建条目元数据字典：始终携带原始 JSON，并在宽高已知时附加 "width"/"height"
+    /// （供 UI 显示分辨率徽章）。
+    /// </summary>
+    protected static Dictionary<string, object?> BuildMetadata(
+        JsonNode? root,
+        long? width,
+        long? height)
+    {
+        var metadata = new Dictionary<string, object?>
+        {
+            ["raw"] = root?.ToJsonString(),
+        };
+        if (width is > 0)
+        {
+            metadata["width"] = width.Value;
+        }
+
+        if (height is > 0)
+        {
+            metadata["height"] = height.Value;
+        }
+
+        return metadata;
+    }
+
     /// <summary>根据 ID 与扩展名生成建议文件名。</summary>
     protected static string SuggestFileName(string prefix, string id, string? extension) =>
         extension is null ? $"{prefix}_{id}" : $"{prefix}_{id}.{extension}";

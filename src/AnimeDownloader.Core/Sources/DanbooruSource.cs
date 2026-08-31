@@ -222,6 +222,8 @@ public sealed class DanbooruSource : ImageSourceBase
             .Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
         var extension = InferExtension(url);
         var thumbnail = post?["preview_file_url"]?.GetValue<string>();
+        var width = post?["image_width"]?.GetValue<long>();
+        var height = post?["image_height"]?.GetValue<long>();
 
         return new ImageItem(
             Url: url,
@@ -230,7 +232,7 @@ public sealed class DanbooruSource : ImageSourceBase
             SourceLink: id is null ? null : $"{Endpoint}/posts/{id}",
             Id: id,
             Extension: extension,
-            Metadata: new Dictionary<string, object?> { ["raw"] = root?.ToJsonString() });
+            Metadata: BuildMetadata(root, width, height));
     }
 
     private static string? InferExtension(string url)

@@ -5,75 +5,33 @@
     IsTabStop="True"
     KeyDown="OnPageKeyDown">
 
-    <Grid x:Name="Root" Padding="16,8,16,12" RowSpacing="8">
+    <Grid x:Name="Root" Padding="{StaticResource PagePadding}" RowSpacing="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0">
+        <!-- ============ 头部 ============ -->
+        <Grid x:Name="ToolbarHeader" Grid.Row="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <CommandBar x:Name="Toolbar" Grid.Column="0" DefaultLabelPosition="Right">
-                <AppBarButton x:Name="RefreshButton" Label="换一张" Click="OnRefresh">
-                    <AppBarButton.Icon>
-                        <FontIcon Glyph="&#xE72C;" />
-                    </AppBarButton.Icon>
-                </AppBarButton>
-                <AppBarButton x:Name="SaveButton" Label="保存" Click="OnSave">
-                    <AppBarButton.Icon>
-                        <FontIcon Glyph="&#xE74E;" />
-                    </AppBarButton.Icon>
-                </AppBarButton>
-                <AppBarButton x:Name="FullscreenButton" Label="全屏" Click="OnToggleFullscreen">
-                    <AppBarButton.Icon>
-                        <FontIcon Glyph="&#xE740;" />
-                    </AppBarButton.Icon>
-                </AppBarButton>
-                <AppBarButton x:Name="FitButton" Label="适应屏幕" Click="OnFitToScreen">
-                    <AppBarButton.Icon>
-                        <FontIcon Glyph="&#xE7C3;" />
-                    </AppBarButton.Icon>
-                </AppBarButton>
-                <AppBarButton x:Name="ActualSizeButton" Label="实际大小" Click="OnActualSize">
-                    <AppBarButton.Icon>
-                        <FontIcon Glyph="&#xE738;" />
-                    </AppBarButton.Icon>
-                </AppBarButton>
-                <AppBarButton x:Name="StretchButton" Label="拉伸填充" Click="OnStretchFill">
-                    <AppBarButton.Icon>
-                        <FontIcon Glyph="&#xE78F;" />
-                    </AppBarButton.Icon>
-                </AppBarButton>
-                <AppBarButton x:Name="ZoomOutButton" Label="缩小" Click="OnZoomOut">
-                    <AppBarButton.Icon>
-                        <FontIcon Glyph="&#xE8A2;" />
-                    </AppBarButton.Icon>
-                </AppBarButton>
-                <AppBarButton x:Name="ZoomInButton" Label="放大" Click="OnZoomIn">
-                    <AppBarButton.Icon>
-                        <FontIcon Glyph="&#xE8A3;" />
-                    </AppBarButton.Icon>
-                </AppBarButton>
-            </CommandBar>
-            <StackPanel x:Name="ToolbarContent" Grid.Column="1"
-                        Orientation="Horizontal" Spacing="12"
-                        VerticalAlignment="Center" Margin="12,0,0,0">
-                <TextBlock x:Name="ZoomLabel" Text="100%" FontWeight="SemiBold"
-                           VerticalAlignment="Center" />
-                <TextBlock x:Name="MetaText" Style="{StaticResource AppCaptionTextStyle}"
-                           MaxWidth="420" VerticalAlignment="Center" />
-                <HyperlinkButton x:Name="SourceLinkButton" Content="打开来源"
-                                 Visibility="Collapsed" Click="OnOpenSource"
-                                 VerticalAlignment="Center" />
+            <StackPanel Spacing="3">
+                <TextBlock Text="查看器" Style="{StaticResource AppSectionTitleStyle}" />
+                <TextBlock x:Name="MetaText" Style="{StaticResource AppHintTextStyle}"
+                           TextWrapping="NoWrap" MaxWidth="640"
+                           TextTrimming="CharacterEllipsis" />
             </StackPanel>
+            <HyperlinkButton x:Name="SourceLinkButton" Grid.Column="1" Content="打开来源"
+                             Visibility="Collapsed" Click="OnOpenSource"
+                             VerticalAlignment="Center" />
         </Grid>
 
+        <!-- ============ 沉浸式查看区 ============ -->
         <Grid x:Name="ViewArea" Grid.Row="1"
-              Background="{ThemeResource SolidBackgroundFillColorSecondaryBrush}"
+              Background="{ThemeResource AppViewerBackgroundBrush}"
               CornerRadius="{StaticResource PanelCornerRadius}"
               DoubleTapped="OnViewAreaDoubleTapped">
             <ScrollViewer x:Name="ViewScroller"
@@ -88,19 +46,100 @@
                           VerticalScrollMode="Enabled">
                 <Image x:Name="ViewImage" Stretch="Uniform" />
             </ScrollViewer>
-            <ProgressRing x:Name="LoadingRing" Width="48" Height="48" IsActive="False" />
+
+            <ProgressRing x:Name="LoadingRing" Width="48" Height="48" IsActive="False"
+                          Foreground="{ThemeResource AppAccentBrush}" />
+
             <StackPanel x:Name="ErrorPanel" Visibility="Collapsed"
                         HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
                 <FontIcon Glyph="&#xE7BA;" FontSize="48"
-                          Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                <TextBlock x:Name="ErrorText" Text="加载失败" />
-                <Button x:Name="RetryButton" Content="重试" Click="OnRetry" />
+                          Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                <TextBlock x:Name="ErrorText" Text="加载失败"
+                           Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                <Button x:Name="RetryButton" Content="重试" Click="OnRetry"
+                        Style="{StaticResource AppPillButtonStyle}" />
             </StackPanel>
+
+            <!-- 图片信息胶囊（左下） -->
+            <StackPanel x:Name="InfoChips" Orientation="Horizontal" Spacing="8"
+                        HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                        Margin="14,0,0,16" Visibility="Collapsed">
+                <Border x:Name="ArtistChip" Style="{StaticResource AppChipBorderStyle}">
+                    <TextBlock x:Name="ArtistText" FontSize="11.5" FontWeight="SemiBold"
+                               Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                </Border>
+                <Border x:Name="ResChip" Style="{StaticResource AppChipBorderStyle}"
+                        Visibility="Collapsed">
+                    <TextBlock x:Name="ResText" FontSize="11.5" FontWeight="SemiBold"
+                               Foreground="{ThemeResource AppTextPrimaryBrush}" />
+                </Border>
+            </StackPanel>
+
+            <!-- 浮动工具栏（底部居中） -->
+            <Border x:Name="FloatingToolbar" Style="{StaticResource AppFloatingToolbarStyle}"
+                    HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                    Margin="0,0,0,16" Opacity="0.97">
+                <StackPanel Orientation="Horizontal" Spacing="2">
+                    <Button x:Name="RefreshButton" Style="{StaticResource AppIconButtonStyle}"
+                            Click="OnRefresh" ToolTipService.ToolTip="换一张（空格）">
+                        <FontIcon Glyph="&#xE72C;" FontSize="15" />
+                    </Button>
+                    <Button x:Name="SaveButton" Style="{StaticResource AppIconButtonStyle}"
+                            Click="OnSave" ToolTipService.ToolTip="保存（Ctrl+S）">
+                        <FontIcon Glyph="&#xE74E;" FontSize="15" />
+                    </Button>
+                    <Border Width="1" Height="22" Margin="6,8" VerticalAlignment="Center"
+                            Background="{ThemeResource AppCardStrokeBrush}" />
+                    <Button x:Name="ZoomOutButton" Style="{StaticResource AppIconButtonStyle}"
+                            Click="OnZoomOut" ToolTipService.ToolTip="缩小（Ctrl+-）">
+                        <FontIcon Glyph="&#xE8A2;" FontSize="15" />
+                    </Button>
+                    <Border MinWidth="52" Padding="6,0" VerticalAlignment="Center">
+                        <TextBlock x:Name="ZoomLabel" Text="100%" FontWeight="SemiBold" FontSize="12"
+                                   Foreground="{ThemeResource AppTextPrimaryBrush}"
+                                   HorizontalAlignment="Center" />
+                    </Border>
+                    <Button x:Name="ZoomInButton" Style="{StaticResource AppIconButtonStyle}"
+                            Click="OnZoomIn" ToolTipService.ToolTip="放大（Ctrl++）">
+                        <FontIcon Glyph="&#xE8A3;" FontSize="15" />
+                    </Button>
+                    <Border Width="1" Height="22" Margin="6,8" VerticalAlignment="Center"
+                            Background="{ThemeResource AppCardStrokeBrush}" />
+                    <Button x:Name="FitButton" Style="{StaticResource AppIconButtonStyle}"
+                            Click="OnFitToScreen" ToolTipService.ToolTip="适应屏幕（Ctrl+0）">
+                        <FontIcon Glyph="&#xE7C3;" FontSize="15" />
+                    </Button>
+                    <Button x:Name="ActualSizeButton" Style="{StaticResource AppIconButtonStyle}"
+                            Click="OnActualSize" ToolTipService.ToolTip="实际大小">
+                        <FontIcon Glyph="&#xE738;" FontSize="15" />
+                    </Button>
+                    <Button x:Name="StretchButton" Style="{StaticResource AppIconButtonStyle}"
+                            Click="OnStretchFill" ToolTipService.ToolTip="拉伸填充">
+                        <FontIcon Glyph="&#xE78F;" FontSize="15" />
+                    </Button>
+                    <Border Width="1" Height="22" Margin="6,8" VerticalAlignment="Center"
+                            Background="{ThemeResource AppCardStrokeBrush}" />
+                    <Button x:Name="FullscreenButton" Style="{StaticResource AppIconButtonStyle}"
+                            Click="OnToggleFullscreen" ToolTipService.ToolTip="全屏（F11）">
+                        <FontIcon Glyph="&#xE740;" FontSize="15" />
+                    </Button>
+                </StackPanel>
+            </Border>
         </Grid>
 
+        <!-- ============ 状态栏 ============ -->
         <Border x:Name="StatusBar" Grid.Row="2" Style="{StaticResource AppStatusBarStyle}">
-            <TextBlock x:Name="StatusText" Text="就绪"
-                       Style="{StaticResource AppCaptionTextStyle}" />
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Ellipse x:Name="StatusDot" Width="8" Height="8"
+                         Style="{StaticResource AppStatusDotOkStyle}"
+                         VerticalAlignment="Center" />
+                <TextBlock x:Name="StatusText" Grid.Column="1" Text="就绪"
+                           Style="{StaticResource AppCaptionTextStyle}" />
+            </Grid>
         </Border>
     </Grid>
 </Page>

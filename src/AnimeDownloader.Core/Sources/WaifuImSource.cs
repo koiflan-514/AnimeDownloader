@@ -166,6 +166,8 @@ public sealed class WaifuImSource : ImageSourceBase
         var artist = ReadStringValue(node?["artists"]?[0]?["name"]);
         var source = ReadStringValue(node?["source"]);
         var extension = ReadStringValue(node?["extension"]) ?? InferExtension(url);
+        var width = node?["width"]?.GetValue<long>();
+        var height = node?["height"]?.GetValue<long>();
 
         return new ImageItem(
             Url: url,
@@ -173,7 +175,7 @@ public sealed class WaifuImSource : ImageSourceBase
             SourceLink: source,
             Id: id,
             Extension: extension,
-            Metadata: new Dictionary<string, object?> { ["raw"] = root?.ToJsonString() });
+            Metadata: BuildMetadata(root, width, height));
     }
 
     /// <summary>将 JSON 节点读取为字符串：兼容字符串与数字（如 waifu.im 的 id 为数字）。</summary>

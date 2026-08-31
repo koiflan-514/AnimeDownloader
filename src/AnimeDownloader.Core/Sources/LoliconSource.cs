@@ -170,6 +170,8 @@ public sealed class LoliconSource : ImageSourceBase
         var extension = InferExtension(url);
         // regular 是 Pixiv 缩略图（比 original 小得多），用作画廊缩略图
         var thumbnail = urls?["regular"]?.GetValue<string>();
+        var width = item?["width"]?.GetValue<long>();
+        var height = item?["height"]?.GetValue<long>();
 
         return new ImageItem(
             Url: url,
@@ -178,7 +180,7 @@ public sealed class LoliconSource : ImageSourceBase
             SourceLink: pid is null ? null : $"https://www.pixiv.net/artworks/{pid}",
             Id: id,
             Extension: extension,
-            Metadata: new Dictionary<string, object?> { ["raw"] = root?.ToJsonString() });
+            Metadata: BuildMetadata(root, width, height));
     }
 
     private static string? InferExtension(string url)

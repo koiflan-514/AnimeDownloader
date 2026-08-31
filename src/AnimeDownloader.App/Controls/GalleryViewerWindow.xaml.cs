@@ -237,7 +237,6 @@ public sealed partial class GalleryViewerWindow : Window
         else
         {
             AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen);
-            FullscreenButton.Content = "退出全屏";
             Toolbar.Visibility = Visibility.Collapsed;
         }
     }
@@ -245,7 +244,6 @@ public sealed partial class GalleryViewerWindow : Window
     private void ExitFullscreen()
     {
         AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Overlapped);
-        FullscreenButton.Content = "全屏";
         Toolbar.Visibility = Visibility.Visible;
     }
 
@@ -266,7 +264,7 @@ public sealed partial class GalleryViewerWindow : Window
                 var progress = new Progress<DownloadProgress>(p =>
                 {
                     var percent = p.Percent is { } value ? (int)(value * 100) : 0;
-                    SaveButton.Content = percent > 0 ? $"保存中 {percent}%" : "保存中…";
+                    IndexLabel.Text = percent > 0 ? $"保存中 {percent}%" : "保存中…";
                 });
                 _content = await _downloader.DownloadAsync(item.Url, progress);
             }

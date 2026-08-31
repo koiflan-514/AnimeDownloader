@@ -44,7 +44,7 @@ public readonly record struct BatchDownloadProgress(
 /// <summary>Result of a batch download operation.</summary>
 /// <param name="Succeeded">Files saved (or already present).</param>
 /// <param name="Failed">Items that could not be downloaded.</param>
-/// <param name="SavedFiles">Absolute paths of saved files, in request order.</param>
+/// <param name="SavedFiles">Absolute paths of saved files, in completion order.</param>
 public readonly record struct BatchDownloadResult(
     int Succeeded,
     int Failed,
@@ -65,6 +65,8 @@ public sealed class ImageDownloader : IDisposable
     private readonly SemaphoreSlim _gate;
     private readonly int _retryCount;
     private readonly ThumbnailCache? _cache;
+    private readonly object _thumbnailLock = new();
+    private readonly Dictionary<string, Task<byte[]>> _thumbnailRequests = new(StringComparer.Ordinal);
 
     public ImageDownloader(HttpClient http, ImageDownloaderOptions? options = null)
     {
@@ -112,17 +114,36 @@ public sealed class ImageDownloader : IDisposable
             return Task.FromResult(hit);
         }
 
-        return DownloadAndCacheAsync(url, progress, cancellationToken);
+        Task<byte[]> request;
+        lock (_thumbnailLock)
+        {
+            if (!_thumbnailRequests.TryGetValue(url, out request!))
+            {
+                request = DownloadAndCacheSharedAsync(url, progress);
+                _thumbnailRequests[url] = request;
+            }
+        }
+
+        return cancellationToken.CanBeCanceled ? request.WaitAsync(cancellationToken) : request;
     }
 
-    private async Task<byte[]> DownloadAndCacheAsync(
+    private async Task<byte[]> DownloadAndCacheSharedAsync(
         string url,
-        IProgress<DownloadProgress>? progress,
-        CancellationToken cancellationToken)
+        IProgress<DownloadProgress>? progress)
     {
-        var bytes = await DownloadAsync(url, progress, cancellationToken).ConfigureAwait(false);
-        _cache!.Set(url, bytes);
-        return bytes;
+        try
+        {
+            var bytes = await DownloadAsync(url, progress, CancellationToken.None).ConfigureAwait(false);
+            _cache!.Set(url, bytes);
+            return bytes;
+        }
+        finally
+        {
+            lock (_thumbnailLock)
+            {
+                _thumbnailRequests.Remove(url);
+            }
+        }
     }
 
     /// <summary>
@@ -561,43 +582,61 @@ public sealed class BatchDownloader
         ArgumentNullException.ThrowIfNull(directory);
 
         Directory.CreateDirectory(directory);
-        var saved = new List<string>(items.Count);
+        var saved = new string[items.Count];
         var failed = 0;
+        var completed = 0;
+        var nextSlot = 0;
 
-        for (var i = 0; i < items.Count; i++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var item = items[i];
-            var target = Path.Combine(directory, item.SuggestFileName());
-            var currentName = item.Artist ?? item.Id;
-            try
+        // 并行下载：底层 ImageDownloader 自带并发闸门（MaxConcurrentDownloads），
+        // 这里按 CPU 核数铺开任务即可；单条失败只计数、不中断整批。
+        var parallelism = Math.Max(2, Environment.ProcessorCount);
+        await Parallel.ForEachAsync(
+            items,
+            new ParallelOptions
             {
-                if (File.Exists(target) && new FileInfo(target).Length > 0)
+                MaxDegreeOfParallelism = parallelism,
+                CancellationToken = cancellationToken,
+            },
+            async (item, ct) =>
+            {
+                var slot = Interlocked.Increment(ref nextSlot) - 1;
+                var target = Path.Combine(directory, item.SuggestFileName());
+                try
                 {
-                    saved.Add(target);
+                    if (File.Exists(target) && new FileInfo(target).Length > 0)
+                    {
+                        saved[slot] = target;
+                    }
+                    else
+                    {
+                        await _downloader.DownloadToFileAsync(
+                            item.Url,
+                            target,
+                            progress: null,
+                            ct).ConfigureAwait(false);
+                        saved[slot] = target;
+                    }
                 }
-                else
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
-                    await _downloader.DownloadToFileAsync(
-                        item.Url,
-                        target,
-                        progress: null,
-                        cancellationToken).ConfigureAwait(false);
-                    saved.Add(target);
+                    throw;
                 }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception)
-            {
-                failed++;
-            }
+                catch (Exception)
+                {
+                    Interlocked.Increment(ref failed);
+                }
 
-            progress?.Report(new BatchDownloadProgress(i + 1, items.Count, currentName, null));
-        }
+                progress?.Report(new BatchDownloadProgress(
+                    Interlocked.Increment(ref completed),
+                    items.Count,
+                    item.Artist ?? item.Id,
+                    null));
+            }).ConfigureAwait(false);
 
-        return new BatchDownloadResult(saved.Count, failed, saved);
+        var succeeded = saved.Count(s => s is not null);
+        return new BatchDownloadResult(
+            succeeded,
+            failed,
+            saved.Where(s => s is not null).ToArray());
     }
 }

@@ -32,6 +32,9 @@ public sealed partial class MainWindow : Window
     private NsfwMode _currentNsfwMode = NsfwMode.BlockNsfw;
     private bool _syncingToolbar;
     private int _headerThumbToken;
+    private string _statusText = "就绪";
+    private bool _statusBusy;
+    private bool _statusError;
 
     public MainWindow()
     {
@@ -42,6 +45,7 @@ public sealed partial class MainWindow : Window
         RebuildHttp();
         Title = "AnimeDownloader";
         Root.RequestedTheme = App.ResolveTheme(App.Settings.Theme);
+        SetVersionText();
         SyncToolbarFromSettings();
         ApplyPaneLayout(compact: false);
         SetLogoSource();
@@ -89,6 +93,11 @@ public sealed partial class MainWindow : Window
                 SourceCombo.Items.Add(source);
             }
 
+            if (NsfwSegmented.ItemsSource is null)
+            {
+                NsfwSegmented.ItemsSource = new List<string> { "屏蔽 NSFW", "仅 NSFW", "全部" };
+            }
+
             for (var i = 0; i < SourceCombo.Items.Count; i++)
             {
                 if (SourceCombo.Items[i] is IImageSource s && ReferenceEquals(s, _currentSource))
@@ -99,15 +108,12 @@ public sealed partial class MainWindow : Window
             }
 
             _currentNsfwMode = _settings.NsfwMode.ToCore();
-            for (var i = 0; i < NsfwCombo.Items.Count; i++)
+            NsfwSegmented.SelectedIndex = _currentNsfwMode switch
             {
-                if (NsfwCombo.Items[i] is ComboBoxItem item &&
-                    item.Tag?.ToString() == _currentNsfwMode.ToString())
-                {
-                    NsfwCombo.SelectedIndex = i;
-                    break;
-                }
-            }
+                NsfwMode.OnlyNsfw => 1,
+                NsfwMode.ShowEverything => 2,
+                _ => 0,
+            };
         }
         finally
         {
@@ -128,6 +134,52 @@ public sealed partial class MainWindow : Window
         return _sources.Count > 0
             ? _sources[0]
             : throw new InvalidOperationException("没有可用图源");
+    }
+
+    private static int ModeToIndex(NsfwMode mode) => mode switch
+    {
+        NsfwMode.OnlyNsfw => 1,
+        NsfwMode.ShowEverything => 2,
+        _ => 0,
+    };
+
+    private void SetVersionText()
+    {
+        try
+        {
+            var assembly = typeof(MainWindow).Assembly;
+            var version = System.Diagnostics.FileVersionInfo
+                .GetVersionInfo(assembly.Location)
+                .FileVersion;
+            VersionText.Text = string.IsNullOrWhiteSpace(version)
+                ? string.Empty
+                : $"v{version}";
+        }
+        catch (Exception)
+        {
+            // 版本读取失败不影响启动。
+        }
+    }
+
+    /// <summary>
+    /// 更新侧栏底部状态胶囊：文本 + 颜色状态点（就绪绿 / 忙碌橙 / 错误红）。
+    /// 主题切换时按保存的状态重新上色。
+    /// </summary>
+    public void SetGlobalStatus(string text, bool busy = false, bool error = false)
+    {
+        _statusText = text;
+        _statusBusy = busy;
+        _statusError = error;
+        ApplyGlobalStatus();
+    }
+
+    private void ApplyGlobalStatus()
+    {
+        GlobalStatusText.Text = _statusText;
+        var styleKey = _statusError
+            ? "AppStatusDotErrorStyle"
+            : _statusBusy ? "AppStatusDotBusyStyle" : "AppStatusDotOkStyle";
+        StatusDot.Style = (Style)Application.Current.Resources[styleKey];
     }
 
     private void OnNavigationLoaded(object sender, RoutedEventArgs e)
@@ -211,6 +263,13 @@ public sealed partial class MainWindow : Window
         ContentFrame.Content = page;
     }
 
+    /// <summary>Navigates to settings from contextual onboarding actions.</summary>
+    public void NavigateToSettings()
+    {
+        RootNav.SelectedItem = SettingsNavItem;
+        NavigateTo("settings");
+    }
+
     private void OnSourceSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_syncingToolbar)
@@ -227,16 +286,20 @@ public sealed partial class MainWindow : Window
         SetCurrentSource(source);
     }
 
-    private void OnNsfwSelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void OnNsfwSelectionChanged(object sender, int index)
     {
         if (_syncingToolbar)
         {
             return;
         }
 
-        if (NsfwCombo.SelectedItem is not ComboBoxItem item ||
-            !Enum.TryParse<NsfwMode>(item.Tag?.ToString(), out var mode) ||
-            mode == _currentNsfwMode)
+        var mode = index switch
+        {
+            1 => NsfwMode.OnlyNsfw,
+            2 => NsfwMode.ShowEverything,
+            _ => NsfwMode.BlockNsfw,
+        };
+        if (mode == _currentNsfwMode)
         {
             return;
         }
@@ -344,7 +407,7 @@ public sealed partial class MainWindow : Window
         _currentNsfwMode = mode;
         _settings.NsfwMode = mode.ToStorage();
         _settingsStore.Save(_settings);
-        if (NsfwCombo.SelectedItem is not ComboBoxItem item || item.Tag?.ToString() != mode.ToString())
+        if (NsfwSegmented.SelectedIndex != ModeToIndex(mode))
         {
             SyncToolbarFromSettings();
         }
@@ -376,6 +439,7 @@ public sealed partial class MainWindow : Window
         RebuildHttp();
         Root.RequestedTheme = App.ResolveTheme(_settings.Theme);
         Win11Chrome.Apply(this, Root);
+        ApplyGlobalStatus();
         SyncToolbarFromSettings();
         (_currentPage as IModePage)?.OnSourceChanged();
     }

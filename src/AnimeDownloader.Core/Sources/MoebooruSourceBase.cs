@@ -213,6 +213,8 @@ public abstract class MoebooruSourceBase : ImageSourceBase
         var extension = InferExtension(url);
         var thumbnail = post?["preview_url"]?.GetValue<string>();
         var source = post?["source"]?.GetValue<string>();
+        var width = post?["width"]?.GetValue<long>();
+        var height = post?["height"]?.GetValue<long>();
 
         return new ImageItem(
             Url: url,
@@ -223,7 +225,7 @@ public abstract class MoebooruSourceBase : ImageSourceBase
                 : string.IsNullOrWhiteSpace(source) ? BuildPostLink(id) : source,
             Id: id,
             Extension: extension,
-            Metadata: new Dictionary<string, object?> { ["raw"] = root?.ToJsonString() });
+            Metadata: BuildMetadata(root, width, height));
     }
 
     private static string? InferExtension(string url)

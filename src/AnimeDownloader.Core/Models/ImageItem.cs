@@ -20,6 +20,37 @@ public sealed record ImageItem(
     IReadOnlyDictionary<string, object?>? Metadata = null)
 {
     /// <summary>
+    /// 图片原始分辨率（宽 × 高）。图源解析时写入 Metadata 的 "width"/"height" 键；
+    /// 未知时返回 null，UI 据此决定是否显示分辨率徽章。
+    /// </summary>
+    public (int Width, int Height)? Dimensions
+    {
+        get
+        {
+            if (Metadata is null ||
+                !Metadata.TryGetValue("width", out var wObj) ||
+                !Metadata.TryGetValue("height", out var hObj))
+            {
+                return null;
+            }
+
+            var width = ToInt(wObj);
+            var height = ToInt(hObj);
+            return width > 0 && height > 0 ? (width, height) : null;
+        }
+    }
+
+    private static int ToInt(object? value) => value switch
+    {
+        long l => (int)Math.Clamp(l, 0, int.MaxValue),
+        int i => i,
+        double d => (int)d,
+        float f => (int)f,
+        string s when int.TryParse(s, out var parsed) => parsed,
+        _ => 0,
+    };
+
+    /// <summary>
     /// Builds a suggested file name (without directory), preferring the source id and a known
     /// extension, falling back to a timestamp plus "png" when nothing can be inferred.
     /// </summary>

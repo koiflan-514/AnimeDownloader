@@ -11,8 +11,9 @@ using Windows.System;
 namespace AnimeDownloader.App.Views;
 
 /// <summary>
-/// Viewer page: one large random image with zoom/pan, keyboard shortcuts (Space/Right next,
-/// Ctrl+S save, F11 fullscreen, Esc exit), save progress and a link back to the source post.
+/// 查看器页：沉浸式大图浏览，浮动工具栏支持缩放 / 适应 / 保存 / 全屏，
+/// 键盘快捷键（空格 / 方向键换图，Ctrl+S 保存，F11 全屏，Esc 退出），
+/// 左下角显示作者与分辨率信息胶囊。
 /// </summary>
 public sealed partial class ViewerPage : Page, IModePage
 {
@@ -92,7 +93,10 @@ public sealed partial class ViewerPage : Page, IModePage
         _zoom = 1f;
         ZoomLabel.Text = "100%";
         SourceLinkButton.Visibility = Visibility.Collapsed;
+        InfoChips.Visibility = Visibility.Collapsed;
         StatusText.Text = "加载中…";
+        SetStatusDot(busy: true);
+        _owner?.SetGlobalStatus("加载中…", busy: true);
         _owner?.SetHeaderThumbnail(null);
         try
         {
@@ -109,6 +113,8 @@ public sealed partial class ViewerPage : Page, IModePage
                     : $"加载失败：{_currentSource.LastError}";
                 ErrorPanel.Visibility = Visibility.Visible;
                 StatusText.Text = "加载失败";
+                SetStatusDot(error: true);
+                _owner?.SetGlobalStatus("加载失败", error: true);
                 _owner?.SetHeaderThumbnail(null);
                 return;
             }
@@ -133,7 +139,29 @@ public sealed partial class ViewerPage : Page, IModePage
             SourceLinkButton.Visibility = string.IsNullOrEmpty(item.SourceLink)
                 ? Visibility.Collapsed
                 : Visibility.Visible;
+
+            ArtistText.Text = item.Artist ?? string.Empty;
+            ArtistChip.Visibility = string.IsNullOrEmpty(item.Artist)
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            if (item.Dimensions is { } dims)
+            {
+                ResText.Text = $"{dims.Width} × {dims.Height}";
+                ResChip.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                ResChip.Visibility = Visibility.Collapsed;
+            }
+
+            InfoChips.Visibility = (ArtistChip.Visibility == Visibility.Visible ||
+                                    ResChip.Visibility == Visibility.Visible)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
             StatusText.Text = "就绪";
+            SetStatusDot();
+            _owner?.SetGlobalStatus("就绪");
             _owner?.SetHeaderThumbnail(item);
         }
         catch (Exception ex)
@@ -146,6 +174,8 @@ public sealed partial class ViewerPage : Page, IModePage
             ErrorText.Text = $"加载失败：{ex.Message}";
             ErrorPanel.Visibility = Visibility.Visible;
             StatusText.Text = "加载失败";
+            SetStatusDot(error: true);
+            _owner?.SetGlobalStatus("加载失败", error: true);
             _owner?.SetHeaderThumbnail(null);
         }
         finally
@@ -155,6 +185,14 @@ public sealed partial class ViewerPage : Page, IModePage
                 LoadingRing.IsActive = false;
             }
         }
+    }
+
+    private void SetStatusDot(bool busy = false, bool error = false)
+    {
+        var key = error
+            ? "AppStatusDotErrorStyle"
+            : busy ? "AppStatusDotBusyStyle" : "AppStatusDotOkStyle";
+        StatusDot.Style = (Style)Application.Current.Resources[key];
     }
 
     private void OnRefresh(object sender, RoutedEventArgs e) => _ = LoadRandomAsync();
@@ -291,7 +329,6 @@ public sealed partial class ViewerPage : Page, IModePage
         }
 
         _owner.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen);
-        FullscreenButton.Label = "退出全屏";
         OnFitToScreen(this, new RoutedEventArgs());
         HideChrome();
     }
@@ -304,14 +341,14 @@ public sealed partial class ViewerPage : Page, IModePage
         }
 
         _owner.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Overlapped);
-        FullscreenButton.Label = "全屏";
         ShowChrome();
     }
 
     private void HideChrome()
     {
-        Toolbar.Visibility = Visibility.Collapsed;
-        ToolbarContent.Visibility = Visibility.Collapsed;
+        ToolbarHeader.Visibility = Visibility.Collapsed;
+        FloatingToolbar.Visibility = Visibility.Collapsed;
+        InfoChips.Visibility = Visibility.Collapsed;
         StatusBar.Visibility = Visibility.Collapsed;
         ViewArea.CornerRadius = new CornerRadius(0);
         Root.Padding = new Thickness(0);
@@ -319,11 +356,15 @@ public sealed partial class ViewerPage : Page, IModePage
 
     private void ShowChrome()
     {
-        Toolbar.Visibility = Visibility.Visible;
-        ToolbarContent.Visibility = Visibility.Visible;
+        ToolbarHeader.Visibility = Visibility.Visible;
+        FloatingToolbar.Visibility = Visibility.Visible;
         StatusBar.Visibility = Visibility.Visible;
-        ViewArea.CornerRadius = new CornerRadius(12);
-        Root.Padding = new Thickness(16, 8, 16, 12);
+        InfoChips.Visibility = (ArtistChip.Visibility == Visibility.Visible ||
+                                ResChip.Visibility == Visibility.Visible)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        ViewArea.CornerRadius = new CornerRadius(16);
+        Root.Padding = (Thickness)Application.Current.Resources["PagePadding"];
     }
 
     private async void OnOpenSource(object sender, RoutedEventArgs e)
@@ -340,6 +381,7 @@ public sealed partial class ViewerPage : Page, IModePage
         catch (Exception ex)
         {
             StatusText.Text = $"打开来源失败：{ex.Message}";
+            SetStatusDot(error: true);
         }
     }
 
@@ -359,7 +401,8 @@ public sealed partial class ViewerPage : Page, IModePage
                 var progress = new Progress<DownloadProgress>(p =>
                 {
                     var percent = p.Percent is { } value ? (int)(value * 100) : 0;
-                    SaveButton.Label = percent > 0 ? $"保存中 {percent}%" : "保存中…";
+                    StatusText.Text = percent > 0 ? $"保存中 {percent}%" : "保存中…";
+                    _owner?.SetGlobalStatus("保存中…", busy: true);
                 });
                 _content = await _downloader.DownloadAsync(_current.Url, progress);
             }
@@ -380,14 +423,17 @@ public sealed partial class ViewerPage : Page, IModePage
 
             await Windows.Storage.FileIO.WriteBytesAsync(file, _content);
             StatusText.Text = "已保存";
+            SetStatusDot();
+            _owner?.SetGlobalStatus("已保存");
         }
         catch (Exception ex)
         {
             StatusText.Text = $"保存失败：{ex.Message}";
+            SetStatusDot(error: true);
+            _owner?.SetGlobalStatus("保存失败", error: true);
         }
         finally
         {
-            SaveButton.Label = "保存";
             SaveButton.IsEnabled = true;
             _isSaving = false;
         }

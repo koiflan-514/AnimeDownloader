@@ -7,9 +7,8 @@ using Windows.Storage.Pickers;
 namespace AnimeDownloader.App.Views;
 
 /// <summary>
-/// Settings page: NSFW filter, theme, reload interval, gallery count, proxy/timeout,
-/// download directory, concurrency, thumbnail cache and per-source tags. Saving applies
-/// immediately through <see cref="MainWindow.ApplySettings"/>.
+/// 设置页：NSFW 过滤、主题、刷新间隔、画廊数量、代理 / 超时、下载目录、并发数、
+/// 缩略图缓存与各图源标签。保存后通过 <see cref="MainWindow.ApplySettings"/> 立即生效。
 /// </summary>
 public sealed partial class SettingsPage : Page, IModePage
 {
@@ -24,6 +23,8 @@ public sealed partial class SettingsPage : Page, IModePage
     public SettingsPage()
     {
         InitializeComponent();
+        NsfwSegmented.ItemsSource = new List<string> { "屏蔽 NSFW", "仅 NSFW", "全部显示" };
+        ThemeSegmented.ItemsSource = new List<string> { "跟随系统", "浅色", "深色" };
     }
 
     // ---------------- IModePage ----------------
@@ -35,13 +36,13 @@ public sealed partial class SettingsPage : Page, IModePage
         _settings = owner.Settings;
         _sources = owner.Sources;
 
-        NsfwCombo.SelectedIndex = _settings.NsfwMode switch
+        NsfwSegmented.SelectedIndex = _settings.NsfwMode switch
         {
             NsfwModeStorage.OnlyNsfw => 1,
             NsfwModeStorage.ShowEverything => 2,
             _ => 0,
         };
-        ThemeCombo.SelectedIndex = _settings.Theme switch
+        ThemeSegmented.SelectedIndex = _settings.Theme switch
         {
             "light" => 1,
             "dark" => 2,
@@ -183,13 +184,18 @@ public sealed partial class SettingsPage : Page, IModePage
             return;
         }
 
-        _settings.NsfwMode = NsfwCombo.SelectedIndex switch
+        _settings.NsfwMode = NsfwSegmented.SelectedIndex switch
         {
             1 => NsfwModeStorage.OnlyNsfw,
             2 => NsfwModeStorage.ShowEverything,
             _ => NsfwModeStorage.BlockNsfw,
         };
-        _settings.Theme = (ThemeCombo.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "default";
+        _settings.Theme = ThemeSegmented.SelectedIndex switch
+        {
+            1 => "light",
+            2 => "dark",
+            _ => "default",
+        };
         _settings.AutoReloadIntervalSeconds = (int)IntervalBox.Value;
         _settings.GalleryCount = (int)CountBox.Value;
         _settings.AutoReloadEnabled = AutoReloadCheck.IsChecked == true;
@@ -248,13 +254,13 @@ public sealed partial class SettingsPage : Page, IModePage
             return;
         }
 
-        NsfwCombo.SelectedIndex = _settings.NsfwMode switch
+        NsfwSegmented.SelectedIndex = _settings.NsfwMode switch
         {
             NsfwModeStorage.OnlyNsfw => 1,
             NsfwModeStorage.ShowEverything => 2,
             _ => 0,
         };
-        ThemeCombo.SelectedIndex = _settings.Theme switch
+        ThemeSegmented.SelectedIndex = _settings.Theme switch
         {
             "light" => 1,
             "dark" => 2,

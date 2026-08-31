@@ -37,7 +37,11 @@ public sealed class AppSettings
     public string Theme { get; set; } = "default";
 
     /// <summary>Default directory used for batch downloads (last used).</summary>
-    public string? DownloadDirectory { get; set; }
+    public string? DownloadDirectory { get; set; } = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+
+    /// <summary>Whether the welcome hint has already been dismissed by the user.</summary>
+    public bool WelcomeHintDismissed { get; set; }
 
     /// <summary>Maximum concurrent downloads shared by gallery thumbnails and batch saves.</summary>
     public int MaxConcurrentDownloads { get; set; } = 4;

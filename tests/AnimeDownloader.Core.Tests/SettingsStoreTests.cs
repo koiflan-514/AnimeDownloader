@@ -31,6 +31,8 @@ public class SettingsStoreTests : IDisposable
         Assert.Equal(30, settings.AutoReloadIntervalSeconds);
         Assert.Equal(12, settings.GalleryCount);
         Assert.Equal("random", settings.GallerySubmode);
+        Assert.False(settings.WelcomeHintDismissed);
+        Assert.False(string.IsNullOrWhiteSpace(settings.DownloadDirectory));
         Assert.False(File.Exists(store.ConfigFile), "加载默认值时不应落盘");
     }
 
@@ -70,6 +72,7 @@ public class SettingsStoreTests : IDisposable
         settings.EnableThumbnailCache = false;
         settings.RequestTimeoutSeconds = 45;
         settings.ThumbnailProxyTemplate = "https://images.weserv.nl/?url={url}&w=480";
+        settings.WelcomeHintDismissed = true;
 
         store.Save(settings);
 
@@ -85,6 +88,7 @@ public class SettingsStoreTests : IDisposable
         Assert.False(reloaded.EnableThumbnailCache);
         Assert.Equal(45, reloaded.RequestTimeoutSeconds);
         Assert.Equal("https://images.weserv.nl/?url={url}&w=480", reloaded.ThumbnailProxyTemplate);
+        Assert.True(reloaded.WelcomeHintDismissed);
     }
 
     [Fact]

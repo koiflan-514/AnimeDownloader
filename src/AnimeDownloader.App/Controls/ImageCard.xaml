@@ -4,44 +4,100 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     PointerEntered="OnPointerEntered"
     PointerExited="OnPointerExited"
+    KeyDown="OnCardKeyDown"
     IsTabStop="True"
     AutomationProperties.Name="图片卡片">
+
+    <UserControl.Resources>
+        <!-- 微光扫过占位 -->
+        <LinearGradientBrush x:Key="ShimmerBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Offset="0" Color="#00FFFFFF" />
+            <GradientStop Offset="0.5" Color="#59FFFFFF" />
+            <GradientStop Offset="1" Color="#00FFFFFF" />
+        </LinearGradientBrush>
+    </UserControl.Resources>
 
     <Grid x:Name="CardRoot" RenderTransformOrigin="0.5,0.5">
         <Grid.RenderTransform>
             <ScaleTransform x:Name="CardScale" ScaleX="1" ScaleY="1" />
         </Grid.RenderTransform>
 
-        <Border Style="{StaticResource AppCardBorderStyle}">
-            <Grid>
-                <Image x:Name="Thumb" Stretch="UniformToFill" />
-                <Border x:Name="ArtistOverlay"
-                        VerticalAlignment="Bottom"
-                        Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
-                        Opacity="0.88"
-                        Visibility="Collapsed"
-                        Padding="8,4">
-                    <TextBlock x:Name="ArtistText"
-                               Style="{StaticResource AppCaptionTextStyle}"
-                               FontSize="11"
-                               TextAlignment="Center"
-                               MaxLines="1" />
-                </Border>
-            </Grid>
-        </Border>
+        <Grid x:Name="CardVisual">
+            <Grid.RenderTransform>
+                <!-- Y 默认 0：入场动画（延迟 > 0 的卡片）开始时由代码设为 14 再动画回 0；
+                     延迟为 0 的首卡不参与动画，保持原位，避免内容被永久下推 -->
+                <TranslateTransform x:Name="CardTranslate" Y="0" />
+            </Grid.RenderTransform>
 
-        <ProgressRing x:Name="LoadingRing" Width="28" Height="28" IsActive="True" />
+            <Border x:Name="CardBorder" Style="{StaticResource AppCardBorderStyle}">
+                <Grid x:Name="CardContent">
+                    <!-- 微光占位层 -->
+                    <Border x:Name="ShimmerHost" CornerRadius="11" Background="{ThemeResource AppCardFillBrush}">
+                        <Border x:Name="ShimmerSlide" Width="360" HorizontalAlignment="Left"
+                                Background="{StaticResource ShimmerBrush}">
+                            <Border.RenderTransform>
+                                <TranslateTransform x:Name="ShimmerTranslate" X="-400" />
+                            </Border.RenderTransform>
+                        </Border>
+                    </Border>
 
-        <Border x:Name="ErrorOverlay"
-                Background="{ThemeResource LayerFillColorDefaultBrush}"
-                Visibility="Collapsed">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
-                <FontIcon Glyph="&#xE7BA;" FontSize="24"
-                          Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                          HorizontalAlignment="Center" />
-                <TextBlock x:Name="ErrorText" Text="加载失败" FontSize="11"
-                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-            </StackPanel>
-        </Border>
+                    <Image x:Name="Thumb" Stretch="UniformToFill" Visibility="Collapsed" />
+
+                    <!-- 底部艺术家信息（渐变 + 文本，右侧预留操作按钮空间） -->
+                    <Border x:Name="ArtistScrim" VerticalAlignment="Bottom" Height="46"
+                            Background="{ThemeResource AppScrimBrush}"
+                            Visibility="Collapsed">
+                        <TextBlock x:Name="ArtistText"
+                                   Style="{StaticResource AppCaptionTextStyle}"
+                                   FontSize="11.5"
+                                   Foreground="White"
+                                   FontWeight="SemiBold"
+                                   MaxLines="1"
+                                   Padding="10,8,92,8"
+                                   TextAlignment="Left" />
+                    </Border>
+
+                    <!-- 悬浮快捷操作：打开 + 保存 -->
+                    <StackPanel x:Name="HoverActions" Orientation="Horizontal" Spacing="4"
+                                HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                Margin="0,0,8,8" Visibility="Collapsed">
+                        <Button x:Name="OpenButton" Style="{StaticResource AppSmallIconButtonStyle}"
+                                Background="#B3000000"
+                                Click="OnOpenClick"
+                                ToolTipService.ToolTip="打开大图（双击 / 回车）">
+                            <FontIcon Glyph="&#xE768;" FontSize="12" Foreground="White" />
+                        </Button>
+                        <Button x:Name="SaveButton" Style="{StaticResource AppSmallIconButtonStyle}"
+                                Background="#B3000000"
+                                Click="OnQuickSave"
+                                ToolTipService.ToolTip="保存到下载目录">
+                            <FontIcon Glyph="&#xE896;" FontSize="12" Foreground="White" />
+                        </Button>
+                    </StackPanel>
+
+                    <!-- 分辨率徽章 -->
+                    <Border x:Name="ResBadge" HorizontalAlignment="Right" VerticalAlignment="Top"
+                            Margin="0,8,8,0" Visibility="Collapsed"
+                            CornerRadius="6" Background="#B3000000" Padding="7,3">
+                        <TextBlock x:Name="ResText" FontSize="10.5" Foreground="White"
+                                   FontWeight="SemiBold" />
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- 加载失败覆盖层 -->
+            <Border x:Name="ErrorOverlay"
+                    Background="{ThemeResource AppCardFillBrush}"
+                    CornerRadius="11"
+                    Visibility="Collapsed">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
+                    <FontIcon Glyph="&#xE7BA;" FontSize="24"
+                              Foreground="{ThemeResource AppTextSecondaryBrush}"
+                              HorizontalAlignment="Center" />
+                    <TextBlock x:Name="ErrorText" Text="加载失败" FontSize="11"
+                               Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </UserControl>
