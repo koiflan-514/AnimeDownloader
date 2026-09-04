@@ -2,6 +2,7 @@ using AnimeDownloader.Core.Services;
 using AnimeDownloader.Core.Sources;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using Windows.Storage.Pickers;
 
 namespace AnimeDownloader.App.Views;
@@ -18,7 +19,20 @@ public sealed partial class SettingsPage : Page, IModePage
     private IReadOnlyList<IImageSource> _sources = Array.Empty<IImageSource>();
     private readonly Dictionary<string, TextBox> _tagBoxes = new();
 
-    private sealed record ProbeRow(string StatusIcon, string DisplayName, string StatusText);
+    /// <summary>探测结果行：状态用 Fluent 图标 + 系统语义色，不再使用 emoji。</summary>
+    private sealed record ProbeRow(string StatusGlyph, Brush StatusBrush, string DisplayName, string StatusText);
+
+    private static Brush SystemBrush(string key)
+    {
+        try
+        {
+            return (Brush)Application.Current.Resources[key];
+        }
+        catch (Exception)
+        {
+            return new SolidColorBrush(Microsoft.UI.Colors.Gray);
+        }
+    }
 
     public SettingsPage()
     {
@@ -50,10 +64,12 @@ public sealed partial class SettingsPage : Page, IModePage
         };
         IntervalBox.Value = _settings.AutoReloadIntervalSeconds;
         CountBox.Value = _settings.GalleryCount;
-        AutoReloadCheck.IsChecked = _settings.AutoReloadEnabled;
+        AutoReloadCheck.IsOn = _settings.AutoReloadEnabled;
         ProxyBox.Text = _settings.ProxyUrl ?? string.Empty;
         NoProxyCheck.IsChecked = _settings.UseNoProxy;
         TimeoutBox.Value = _settings.RequestTimeoutSeconds;
+        GelbooruUserIdBox.Text = _settings.GelbooruUserId ?? string.Empty;
+        GelbooruApiKeyBox.Text = _settings.GelbooruApiKey ?? string.Empty;
         DownloadDirBox.Text = _settings.DownloadDirectory ?? string.Empty;
         ConcurrencyBox.Value = Math.Clamp(_settings.MaxConcurrentDownloads, 1, 16);
         CacheToggle.IsOn = _settings.EnableThumbnailCache;
@@ -157,10 +173,15 @@ public sealed partial class SettingsPage : Page, IModePage
             {
                 ProbeResults.Items.Add(result switch
                 {
-                    { NeedsProxy: true } => new ProbeRow("🔒", result.DisplayName, "需代理（直连不可达，代理可达）"),
-                    { Unreachable: true } => new ProbeRow("✗", result.DisplayName,
-                        $"不可达（直连 {result.DirectDetail}；代理 {result.ProxyDetail}）"),
-                    _ => new ProbeRow("✓", result.DisplayName, $"直连可用（{result.DirectDetail}）"),
+                    { NeedsProxy: true } => new ProbeRow(
+                        "\uE72E", SystemBrush("SystemFillColorCautionBrush"),
+                        result.DisplayName, "需代理（直连不可达，代理可达）"),
+                    { Unreachable: true } => new ProbeRow(
+                        "\uE783", SystemBrush("SystemFillColorCriticalBrush"),
+                        result.DisplayName, $"不可达（直连 {result.DirectDetail}；代理 {result.ProxyDetail}）"),
+                    _ => new ProbeRow(
+                        "\uE73E", SystemBrush("SystemFillColorSuccessBrush"),
+                        result.DisplayName, $"直连可用（{result.DirectDetail}）"),
                 });
             }
 
@@ -198,10 +219,16 @@ public sealed partial class SettingsPage : Page, IModePage
         };
         _settings.AutoReloadIntervalSeconds = (int)IntervalBox.Value;
         _settings.GalleryCount = (int)CountBox.Value;
-        _settings.AutoReloadEnabled = AutoReloadCheck.IsChecked == true;
+        _settings.AutoReloadEnabled = AutoReloadCheck.IsOn;
         _settings.ProxyUrl = string.IsNullOrWhiteSpace(ProxyBox.Text) ? null : ProxyBox.Text.Trim();
         _settings.UseNoProxy = NoProxyCheck.IsChecked == true;
         _settings.RequestTimeoutSeconds = (int)TimeoutBox.Value;
+        _settings.GelbooruUserId = string.IsNullOrWhiteSpace(GelbooruUserIdBox.Text)
+            ? null
+            : GelbooruUserIdBox.Text.Trim();
+        _settings.GelbooruApiKey = string.IsNullOrWhiteSpace(GelbooruApiKeyBox.Text)
+            ? null
+            : GelbooruApiKeyBox.Text.Trim();
         _settings.DownloadDirectory = string.IsNullOrWhiteSpace(DownloadDirBox.Text)
             ? null
             : DownloadDirBox.Text.Trim();
@@ -268,10 +295,12 @@ public sealed partial class SettingsPage : Page, IModePage
         };
         IntervalBox.Value = _settings.AutoReloadIntervalSeconds;
         CountBox.Value = _settings.GalleryCount;
-        AutoReloadCheck.IsChecked = _settings.AutoReloadEnabled;
+        AutoReloadCheck.IsOn = _settings.AutoReloadEnabled;
         ProxyBox.Text = _settings.ProxyUrl ?? string.Empty;
         NoProxyCheck.IsChecked = _settings.UseNoProxy;
         TimeoutBox.Value = _settings.RequestTimeoutSeconds;
+        GelbooruUserIdBox.Text = _settings.GelbooruUserId ?? string.Empty;
+        GelbooruApiKeyBox.Text = _settings.GelbooruApiKey ?? string.Empty;
         DownloadDirBox.Text = _settings.DownloadDirectory ?? string.Empty;
         ConcurrencyBox.Value = Math.Clamp(_settings.MaxConcurrentDownloads, 1, 16);
         CacheToggle.IsOn = _settings.EnableThumbnailCache;

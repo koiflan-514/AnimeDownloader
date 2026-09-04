@@ -136,8 +136,8 @@ public sealed partial class GalleryPage : Page, IModePage
         PrevPageButton.IsEnabled = _page > 1;
         PageLabel.Text = $"第 {_page} 页";
         GalleryHint.Text = _pagedMode && _currentSource.SupportsPaging
-            ? $"{_currentSource.DisplayName} · 浏览第 {_page} 页精选作品"
-            : $"{_currentSource.DisplayName} · 每次刷新都会带来新的发现";
+            ? $"{_currentSource.DisplayName} · 第 {_page} 页"
+            : $"{_currentSource.DisplayName} · 随机模式";
         UpdateTagControls();
     }
 
@@ -349,7 +349,7 @@ public sealed partial class GalleryPage : Page, IModePage
                 var message = string.IsNullOrEmpty(_currentSource.LastError)
                     ? "没有找到图片。可尝试更换图源、切换 NSFW 模式或调整标签。"
                     : $"加载失败：{_currentSource.LastError}";
-                ShowEmptyState("这里空空如也", message);
+                ShowEmptyState("没有找到图片", message);
                 RetryButton.Visibility = Visibility.Visible;
                 SetStatusDot(error: true);
                 StatusText.Text = message;

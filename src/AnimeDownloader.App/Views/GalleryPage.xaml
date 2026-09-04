@@ -72,9 +72,7 @@
                             VerticalAlignment="Center"
                             Visibility="Collapsed">
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                            <FontIcon Glyph="&#xE1AC;" FontSize="11"
-                                      Foreground="{ThemeResource AppAccentBrush}" />
-                            <TextBlock x:Name="TagChipText" FontSize="11.5" FontWeight="SemiBold"
+                            <TextBlock x:Name="TagChipText" FontSize="11.5"
                                        Foreground="{ThemeResource AppTextPrimaryBrush}"
                                        VerticalAlignment="Center" MaxWidth="260"
                                        TextTrimming="CharacterEllipsis" />
@@ -142,11 +140,10 @@
             <StackPanel x:Name="EmptyStatePanel" Visibility="Collapsed"
                         HorizontalAlignment="Center" VerticalAlignment="Center"
                         Spacing="10" MaxWidth="420">
-                <FontIcon Glyph="&#xE8B9;" FontSize="44"
-                          Foreground="{ThemeResource AppAccentBrush}"
+                <FontIcon Glyph="&#xE91B;" FontSize="40"
+                          Foreground="{ThemeResource AppTextSecondaryBrush}"
                           HorizontalAlignment="Center" />
-                <TextBlock x:Name="EmptyTitle" Text="这里空空如也" FontSize="17" FontWeight="SemiBold"
-                           Foreground="{ThemeResource AppTextPrimaryBrush}"
+                <TextBlock x:Name="EmptyTitle" Text="暂无图片" Style="{StaticResource SubtitleTextBlockStyle}"
                            HorizontalAlignment="Center" />
                 <TextBlock x:Name="EmptyMessage" Style="{StaticResource AppHintTextStyle}"
                            TextAlignment="Center" HorizontalAlignment="Center" />

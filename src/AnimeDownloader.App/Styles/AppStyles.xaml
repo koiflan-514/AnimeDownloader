@@ -21,7 +21,8 @@
 
     <Style x:Key="AppSectionTitleStyle" TargetType="TextBlock">
         <Setter Property="Foreground" Value="{ThemeResource AppTextPrimaryBrush}" />
-        <Setter Property="FontSize" Value="22" />
+        <!-- Fluent 字阶：页面标题 = Title 28px -->
+        <Setter Property="FontSize" Value="28" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="TextWrapping" Value="NoWrap" />
     </Style>
@@ -72,7 +73,7 @@
     </Style>
 
     <!-- ==================== 按钮样式 ==================== -->
-    <!-- 强调渐变按钮（主操作） -->
+    <!-- 强调按钮（主操作）：纯色强调 + 常规字重，与 Win11 原生一致 -->
     <Style x:Key="AppAccentButtonStyle" TargetType="Button">
         <Setter Property="Background" Value="{ThemeResource AppAccentGradientBrush}" />
         <Setter Property="Foreground" Value="White" />
@@ -80,7 +81,7 @@
         <Setter Property="Padding" Value="18,9" />
         <Setter Property="MinHeight" Value="38" />
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontWeight" Value="Normal" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -119,18 +120,19 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <Grid x:Name="RootGrid" Background="Transparent">
+                                        <Grid x:Name="RootGrid" Background="Transparent">
                         <VisualStateManager.VisualStateGroups>
                             <VisualStateGroup x:Name="CommonStates">
                                 <VisualState x:Name="Normal" />
                                 <VisualState x:Name="PointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="RootBorder.Background" Value="{ThemeResource AppTagChipBrush}" />
+                                        <Setter Target="HoverLayer.Opacity" Value="1" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
                                     <VisualState.Setters>
-                                        <Setter Target="RootBorder.Background" Value="{ThemeResource AppAccentSoftBrush}" />
+                                        <Setter Target="HoverLayer.Opacity" Value="1" />
+                                        <Setter Target="HoverLayer.Background" Value="{ThemeResource AppAccentSoftBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Disabled">
@@ -142,19 +144,19 @@
                             <VisualStateGroup x:Name="CheckStates">
                                 <VisualState x:Name="Checked">
                                     <VisualState.Setters>
-                                        <Setter Target="RootBorder.Background" Value="{ThemeResource AppAccentGradientBrush}" />
+                                        <Setter Target="CheckBorder.Background" Value="{ThemeResource AppAccentGradientBrush}" />
                                         <Setter Target="ContentPresenter.Foreground" Value="White" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="CheckedPointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="RootBorder.Background" Value="{ThemeResource AppAccentGradientBrush}" />
+                                        <Setter Target="CheckBorder.Background" Value="{ThemeResource AppAccentGradientBrush}" />
                                         <Setter Target="ContentPresenter.Foreground" Value="White" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="CheckedPressed">
                                     <VisualState.Setters>
-                                        <Setter Target="RootBorder.Background" Value="{ThemeResource AppAccentGradientBrush}" />
+                                        <Setter Target="CheckBorder.Background" Value="{ThemeResource AppAccentGradientBrush}" />
                                         <Setter Target="ContentPresenter.Foreground" Value="White" />
                                     </VisualState.Setters>
                                 </VisualState>
@@ -163,27 +165,32 @@
                                         <Setter Target="RootGrid.Opacity" Value="0.5" />
                                     </VisualState.Setters>
                                 </VisualState>
-                                <VisualState x:Name="Unchecked" />
+                                <VisualState x:Name="Unchecked">
+                                    <VisualState.Setters>
+                                        <Setter Target="CheckBorder.Background" Value="Transparent" />
+                                    </VisualState.Setters>
+                                </VisualState>
                                 <VisualState x:Name="UncheckedPointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="RootBorder.Background" Value="{ThemeResource AppTagChipBrush}" />
+                                        <Setter Target="CheckBorder.Background" Value="Transparent" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Indeterminate" />
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
-                        <Border x:Name="RootBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="7"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter x:Name="ContentPresenter"
-                                              Content="{TemplateBinding Content}"
-                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                              Foreground="{TemplateBinding Foreground}" />
-                        </Border>
+                        <!-- 选中强调色与悬停反馈分层：CheckBorder 只受 CheckStates 控制，
+                             HoverLayer 只受 CommonStates 控制，避免两组状态争抢同一属性
+                             导致选中强调色在指针/焦点掠过时被悬停底色覆盖 -->
+                        <Border x:Name="CheckBorder" Background="Transparent" CornerRadius="7" />
+                        <Border x:Name="HoverLayer"
+                                Background="{ThemeResource AppTagChipBrush}"
+                                CornerRadius="7" Opacity="0" IsHitTestVisible="False" />
+                        <ContentPresenter x:Name="ContentPresenter"
+                                          Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          Content="{TemplateBinding Content}" />
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>
@@ -205,18 +212,19 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
-                    <Grid x:Name="RootGrid" Background="Transparent">
+                                        <Grid x:Name="RootGrid" Background="Transparent">
                         <VisualStateManager.VisualStateGroups>
                             <VisualStateGroup x:Name="CommonStates">
                                 <VisualState x:Name="Normal" />
                                 <VisualState x:Name="PointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="RootBorder.Background" Value="{ThemeResource AppTagChipBrush}" />
+                                        <Setter Target="HoverLayer.Opacity" Value="1" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Pressed">
                                     <VisualState.Setters>
-                                        <Setter Target="RootBorder.Background" Value="{ThemeResource AppAccentSoftBrush}" />
+                                        <Setter Target="HoverLayer.Opacity" Value="1" />
+                                        <Setter Target="HoverLayer.Background" Value="{ThemeResource AppAccentSoftBrush}" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Disabled">
@@ -228,19 +236,19 @@
                             <VisualStateGroup x:Name="CheckStates">
                                 <VisualState x:Name="Checked">
                                     <VisualState.Setters>
-                                        <Setter Target="RootBorder.Background" Value="{ThemeResource AppAccentGradientBrush}" />
+                                        <Setter Target="CheckBorder.Background" Value="{ThemeResource AppAccentGradientBrush}" />
                                         <Setter Target="ContentPresenter.Foreground" Value="White" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="CheckedPointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="RootBorder.Background" Value="{ThemeResource AppAccentGradientBrush}" />
+                                        <Setter Target="CheckBorder.Background" Value="{ThemeResource AppAccentGradientBrush}" />
                                         <Setter Target="ContentPresenter.Foreground" Value="White" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="CheckedPressed">
                                     <VisualState.Setters>
-                                        <Setter Target="RootBorder.Background" Value="{ThemeResource AppAccentGradientBrush}" />
+                                        <Setter Target="CheckBorder.Background" Value="{ThemeResource AppAccentGradientBrush}" />
                                         <Setter Target="ContentPresenter.Foreground" Value="White" />
                                     </VisualState.Setters>
                                 </VisualState>
@@ -249,27 +257,32 @@
                                         <Setter Target="RootGrid.Opacity" Value="0.5" />
                                     </VisualState.Setters>
                                 </VisualState>
-                                <VisualState x:Name="Unchecked" />
+                                <VisualState x:Name="Unchecked">
+                                    <VisualState.Setters>
+                                        <Setter Target="CheckBorder.Background" Value="Transparent" />
+                                    </VisualState.Setters>
+                                </VisualState>
                                 <VisualState x:Name="UncheckedPointerOver">
                                     <VisualState.Setters>
-                                        <Setter Target="RootBorder.Background" Value="{ThemeResource AppTagChipBrush}" />
+                                        <Setter Target="CheckBorder.Background" Value="Transparent" />
                                     </VisualState.Setters>
                                 </VisualState>
                                 <VisualState x:Name="Indeterminate" />
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
-                        <Border x:Name="RootBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="7"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter x:Name="ContentPresenter"
-                                              Content="{TemplateBinding Content}"
-                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                              Foreground="{TemplateBinding Foreground}" />
-                        </Border>
+                        <!-- 选中强调色与悬停反馈分层：CheckBorder 只受 CheckStates 控制，
+                             HoverLayer 只受 CommonStates 控制，避免两组状态争抢同一属性
+                             导致选中强调色在指针/焦点掠过时被悬停底色覆盖 -->
+                        <Border x:Name="CheckBorder" Background="Transparent" CornerRadius="7" />
+                        <Border x:Name="HoverLayer"
+                                Background="{ThemeResource AppTagChipBrush}"
+                                CornerRadius="7" Opacity="0" IsHitTestVisible="False" />
+                        <ContentPresenter x:Name="ContentPresenter"
+                                          Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          Content="{TemplateBinding Content}" />
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>
@@ -353,5 +366,44 @@
         <Setter Property="CornerRadius" Value="8" />
         <Setter Property="Padding" Value="10,4" />
         <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- ==================== Win11 设置行（SettingsCard 风格） ==================== -->
+    <!-- 分组标题：BodyStrong 14px，置于每张卡片组上方 -->
+    <Style x:Key="AppGroupHeaderStyle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{ThemeResource ContentControlThemeFontFamily}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{ThemeResource AppTextPrimaryBrush}" />
+        <Setter Property="Margin" Value="0,4,0,4" />
+    </Style>
+
+    <!-- 设置卡片：系统主题画刷 + 4px 圆角 + 16px 内边距，与 Win11 设置一致 -->
+    <Style x:Key="AppSettingsCardStyle" TargetType="Border">
+        <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+
+    <!-- 设置行：左侧标题 + 描述，右侧控件（行内容自行布置） -->
+    <Style x:Key="AppSettingsRowStyle" TargetType="Grid">
+        <Setter Property="ColumnSpacing" Value="16" />
+    </Style>
+
+    <!-- 设置行标题：Body 14px -->
+    <Style x:Key="AppSettingsTitleStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{ThemeResource AppTextPrimaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- 设置行描述：Caption 12px 次要色 -->
+    <Style x:Key="AppSettingsDescStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{ThemeResource AppTextSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
 </ResourceDictionary>

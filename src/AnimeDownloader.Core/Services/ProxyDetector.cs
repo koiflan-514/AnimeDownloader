@@ -121,7 +121,7 @@ public static class ProxyDetector
                 result["no_proxy"] = string.Join(",", noProxyParts);
             }
 
-            // ProxyServer 可能为 "host:port" 或 "http=host:port;https=host:port"
+            // ProxyServer 可能为 "host:port" 或 "http=host:port;https=host:port;socks=host:port"
             if (server.Contains('='))
             {
                 foreach (var part in server.Split(';'))
@@ -134,7 +134,16 @@ public static class ProxyDetector
 
                     var scheme = part[..eq].Trim().ToLowerInvariant();
                     var hostPort = part[(eq + 1)..].Trim();
-                    if ((scheme is "http" or "https") && hostPort.Length > 0)
+                    if (hostPort.Length == 0)
+                    {
+                        continue;
+                    }
+
+                    if (scheme is "socks" or "socks4" or "socks5")
+                    {
+                        result.TryAdd("socks", "socks5://" + hostPort);
+                    }
+                    else if (scheme is "http" or "https")
                     {
                         result[scheme] = "http://" + hostPort;
                     }

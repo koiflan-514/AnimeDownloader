@@ -26,8 +26,25 @@ public sealed class GelbooruSource : ImageSourceBase
 
     public override bool SupportsTags => true;
 
+    /// <summary>
+    /// Gelbooru 账号 user_id（2022-09 起 API 强制要求与 api_key 成对提供，见设置页）。
+    /// </summary>
+    public string? UserId { get; set; }
+
+    /// <summary>Gelbooru 账号 api_key，与 <see cref="UserId"/> 成对使用。</summary>
+    public string? ApiKey { get; set; }
+
+    private bool HasCredentials =>
+        !string.IsNullOrWhiteSpace(UserId) && !string.IsNullOrWhiteSpace(ApiKey);
+
+    /// <summary>API 请求地址（带凭据时附上 user_id 与 api_key，供连通性探测与真实请求共用）。</summary>
+    private string ApiUrl =>
+        HasCredentials
+            ? $"{Endpoint}?user_id={Uri.EscapeDataString(UserId!.Trim())}&api_key={Uri.EscapeDataString(ApiKey!.Trim())}"
+            : Endpoint;
+
     /// <inheritdoc />
-    public override string? ProbeUrl => Endpoint;
+    public override string? ProbeUrl => $"{ApiUrl}?page=dapi&s=post&q=index&json=1&limit=1";
 
     private Dictionary<string, string?> BaseQuery(int? limit, int? pid, NsfwMode mode)
     {
@@ -64,6 +81,20 @@ public sealed class GelbooruSource : ImageSourceBase
         return query;
     }
 
+    /// <summary>调用 API 并把 401 翻译为可操作的提示（匿名访问已被 Gelbooru 停用）。</summary>
+    private async Task<JsonNode?> GetApiJsonAsync(
+        Dictionary<string, string?> query,
+        CancellationToken cancellationToken)
+    {
+        var node = await GetJsonAsync(ApiUrl, query, cancellationToken).ConfigureAwait(false);
+        if (node is null && LastError is not null && LastError.Contains("401", StringComparison.Ordinal))
+        {
+            LastError = "Gelbooru 已停用匿名 API：请在设置页填写 user_id 与 api_key 后重试";
+        }
+
+        return node;
+    }
+
     /// <inheritdoc />
     public override async Task<ImageItem?> GetRandomImageAsync(
         NsfwMode mode,
@@ -71,8 +102,7 @@ public sealed class GelbooruSource : ImageSourceBase
     {
         for (var attempt = 0; attempt < 3; attempt++)
         {
-            var data = await GetJsonAsync(
-                Endpoint,
+            var data = await GetApiJsonAsync(
                 BaseQuery(RandomFetchLimit, NextRandomPid(), mode),
                 cancellationToken).ConfigureAwait(false);
             var posts = ReadPosts(data);
@@ -82,8 +112,7 @@ public sealed class GelbooruSource : ImageSourceBase
             }
         }
 
-        var fallback = await GetJsonAsync(
-            Endpoint,
+        var fallback = await GetApiJsonAsync(
             BaseQuery(RandomFetchLimit, 0, mode),
             cancellationToken).ConfigureAwait(false);
         var fallbackPosts = ReadPosts(fallback);
@@ -103,8 +132,7 @@ public sealed class GelbooruSource : ImageSourceBase
 
         for (var attempt = 0; attempt < 3; attempt++)
         {
-            var data = await GetJsonAsync(
-                Endpoint,
+            var data = await GetApiJsonAsync(
                 BaseQuery(Math.Max(count, 1), NextRandomPid(), mode),
                 cancellationToken).ConfigureAwait(false);
             var items = CollectItems(data, count);
@@ -114,8 +142,7 @@ public sealed class GelbooruSource : ImageSourceBase
             }
         }
 
-        var fallback = await GetJsonAsync(
-            Endpoint,
+        var fallback = await GetApiJsonAsync(
             BaseQuery(Math.Max(count, 1), 0, mode),
             cancellationToken).ConfigureAwait(false);
         return CollectItems(fallback, count);
@@ -140,7 +167,7 @@ public sealed class GelbooruSource : ImageSourceBase
         }
 
         var pid = Math.Max(page - 1, 0);
-        var data = await GetJsonAsync(Endpoint, BaseQuery(perPage, pid, mode), cancellationToken)
+        var data = await GetApiJsonAsync(BaseQuery(perPage, pid, mode), cancellationToken)
             .ConfigureAwait(false);
         return CollectItems(data, perPage);
     }

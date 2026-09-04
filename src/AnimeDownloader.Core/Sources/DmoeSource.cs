@@ -34,10 +34,13 @@ public sealed class DmoeSource : ImageSourceBase
             return null;
         }
 
+        // imgurl 可能是百度图片代理链（2026 起该代理对程序化请求返回空 body），
+        // 解码其中内嵌的真实图床地址直取。
+        var realUrl = TryDecodeBaiduProxyUrl(url) ?? url;
         return new ImageItem(
-            Url: url,
+            Url: realUrl,
             Id: DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture),
-            Extension: InferExtension(url));
+            Extension: InferExtension(realUrl));
     }
 
     /// <inheritdoc />
@@ -81,6 +84,50 @@ public sealed class DmoeSource : ImageSourceBase
         }
 
         return items;
+    }
+
+    /// <summary>
+    /// 从百度图片代理链 <c>https://image.baidu.com/search/down?url=&lt;encoded&gt;</c> 中
+    /// 解码真实图床地址；不是该形式时返回 null（调用方回退原 URL）。
+    /// </summary>
+    public static string? TryDecodeBaiduProxyUrl(string? url)
+    {
+        if (string.IsNullOrEmpty(url) ||
+            !url.Contains("image.baidu.com/search/down", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var marker = url.IndexOf("url=", StringComparison.Ordinal);
+        if (marker < 0)
+        {
+            return null;
+        }
+
+        var encoded = url[(marker + 4)..];
+        var ampersand = encoded.IndexOf('&');
+        if (ampersand >= 0)
+        {
+            encoded = encoded[..ampersand];
+        }
+
+        if (encoded.Length == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            var decoded = Uri.UnescapeDataString(encoded);
+            return decoded.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                   decoded.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                ? decoded
+                : null;
+        }
+        catch (UriFormatException)
+        {
+            return null;
+        }
     }
 
     private static string? InferExtension(string url)

@@ -37,6 +37,9 @@ public sealed partial class GalleryViewerWindow : Window
         Win11Chrome.SetIcon(this);
         Win11Chrome.Apply(this, Root);
         Root.Loaded += (_, _) => Win11Chrome.Apply(this, Root);
+        // 与主窗口一致：跟随 Windows 配色并在亮暗切换时重上标题栏。
+        WindowsColorScheme.Instance.Register(Root);
+        Root.ActualThemeChanged += (_, _) => Win11Chrome.ApplyAfterThemeChange(this, Root);
         AppWindow.Resize(new SizeInt32(960, 680));
         ShowItem();
         if (NextButton.IsEnabled)

@@ -58,6 +58,15 @@ public sealed class AppSettings
     /// and the client decodes/caches a small version.
     /// </summary>
     public string? ThumbnailProxyTemplate { get; set; }
+
+    /// <summary>
+    /// Gelbooru API credentials. Gelbooru disabled anonymous API access (HTTP 401) in 2022-09,
+    /// so both values must come from the user's account page for the Gelbooru source to work.
+    /// </summary>
+    public string? GelbooruUserId { get; set; }
+
+    /// <summary>Gelbooru API key, used together with <see cref="GelbooruUserId"/>.</summary>
+    public string? GelbooruApiKey { get; set; }
 }
 
 /// <summary>

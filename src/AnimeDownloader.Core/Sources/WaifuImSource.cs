@@ -163,7 +163,7 @@ public sealed class WaifuImSource : ImageSourceBase
         }
 
         var id = ReadStringValue(node?["id"]);
-        var artist = ReadStringValue(node?["artists"]?[0]?["name"]);
+        var artist = ReadFirstArtist(node?["artists"] as JsonArray);
         var source = ReadStringValue(node?["source"]);
         var extension = ReadStringValue(node?["extension"]) ?? InferExtension(url);
         var width = node?["width"]?.GetValue<long>();
@@ -185,6 +185,10 @@ public sealed class WaifuImSource : ImageSourceBase
         JsonValue value when value.TryGetValue<string>(out var s) => s,
         _ => node?.ToString(),
     };
+
+    /// <summary>取第一位艺术家名；"artists" 可能为空数组（直接索引访问会越界抛异常）。</summary>
+    private static string? ReadFirstArtist(JsonArray? artists) =>
+        artists is { Count: > 0 } ? ReadStringValue(artists[0]?["name"]) : null;
 
     private static string? InferExtension(string url)
     {

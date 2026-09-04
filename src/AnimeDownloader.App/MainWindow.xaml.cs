@@ -52,6 +52,9 @@ public sealed partial class MainWindow : Window
         Win11Chrome.SetIcon(this);
         Win11Chrome.Apply(this, Root);
         Root.Loaded += (_, _) => Win11Chrome.Apply(this, Root);
+        // 跟随用户 Windows 配色：注册主题根 + 标题栏随亮暗切换重上色。
+        WindowsColorScheme.Instance.Register(Root);
+        Root.ActualThemeChanged += (_, _) => Win11Chrome.ApplyAfterThemeChange(this, Root);
     }
 
     private void RebuildHttp()

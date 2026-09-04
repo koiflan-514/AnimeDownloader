@@ -48,12 +48,12 @@
             <NavigationView.MenuItems>
                 <NavigationViewItem x:Name="GalleryNavItem" Content="画廊" Tag="gallery">
                     <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE8B9;" />
+                        <FontIcon Glyph="&#xE91B;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem x:Name="ViewerNavItem" Content="查看器" Tag="viewer">
                     <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE91B;" />
+                        <FontIcon Glyph="&#xE740;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem x:Name="SettingsNavItem" Content="设置" Tag="settings">
@@ -75,29 +75,16 @@
                         MaxDropDownHeight="400"
                         ToolTipService.ToolTip="选择图源"
                         SelectionChanged="OnSourceSelectionChanged">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate>
-                                <Grid ColumnSpacing="10" Padding="0,4">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Border Width="32" Height="32" CornerRadius="8"
-                                            Background="{ThemeResource AppAccentSoftBrush}"
-                                            VerticalAlignment="Center">
-                                        <FontIcon Glyph="&#xE91B;" FontSize="15"
-                                                  Foreground="{ThemeResource AppAccentBrush}" />
-                                    </Border>
-                                    <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"
-                                                   FontSize="13" />
-                                        <TextBlock Text="{Binding Description}" FontSize="11"
-                                                   Foreground="{ThemeResource AppTextSecondaryBrush}"
-                                                   TextTrimming="CharacterEllipsis" MaxLines="1" />
-                                    </StackPanel>
-                                </Grid>
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Spacing="1" Padding="0,4">
+                                <TextBlock Text="{Binding DisplayName}" FontSize="13" />
+                                <TextBlock Text="{Binding Description}" FontSize="11"
+                                           Foreground="{ThemeResource ApplicationSecondaryForegroundThemeBrush}"
+                                           TextTrimming="CharacterEllipsis" MaxLines="1" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
                     </ComboBox>
 
                     <TextBlock Text="NSFW"

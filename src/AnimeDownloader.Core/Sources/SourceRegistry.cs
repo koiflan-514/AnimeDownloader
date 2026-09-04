@@ -25,7 +25,7 @@ public static class SourceRegistry
         };
     }
 
-    /// <summary>把设置中保存的标签写入各图源实例。</summary>
+    /// <summary>把设置中保存的标签（及 Gelbooru API 凭据）写入各图源实例。</summary>
     public static void ApplySettings(IEnumerable<IImageSource> sources, AppSettings settings)
     {
         foreach (var source in sources)
@@ -33,6 +33,12 @@ public static class SourceRegistry
             if (source.SupportsTags && settings.SourceTags.TryGetValue(source.Id, out var tags))
             {
                 source.Tags = tags ?? string.Empty;
+            }
+
+            if (source is GelbooruSource gelbooru)
+            {
+                gelbooru.UserId = settings.GelbooruUserId;
+                gelbooru.ApiKey = settings.GelbooruApiKey;
             }
         }
     }

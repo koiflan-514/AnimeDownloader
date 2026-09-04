@@ -13,14 +13,17 @@
   - **Lolicon** — https://api.lolicon.app（国内可直连，Pixiv 原图，标签搜索与 R18 过滤）
   - **Sakura Random / 樱花随机图** — https://www.dmoe.cc（国内可直连）
   - **Safebooru** — https://safebooru.org（仅全年龄内容，标签搜索）
-  - **Gelbooru** — https://gelbooru.com（标签搜索与 NSFW 分级过滤）
+  - **Gelbooru** — https://gelbooru.com（标签搜索与 NSFW 分级过滤；需在设置页填 API 凭据）
   - **Konachan** — https://konachan.com（标签搜索与 NSFW 分级过滤）
   - **Yande.re** — https://yande.re（标签搜索与 NSFW 分级过滤）
 - 画廊网格浏览：随机 / 分页两种模式，网格随窗口宽度自适应（2-8 列），卡片错峰入场动画、
   悬浮放大高亮、分辨率徽章、艺术家信息条、悬浮快捷保存
 - 画廊标签快速搜索（支持标签的图源，回车应用并自动保存，含活动标签胶囊与一键清除）
 - 分段式 NSFW 三态过滤（全部 / 仅 NSFW / 屏蔽 NSFW）与主题切换（跟随系统 / 浅色 / 深色）
-- 动漫主题设计系统：粉 → 紫渐变强调色、胶囊按钮、圆角卡片、微光加载占位、亮 / 暗双主题资源
+- 配色完全跟随用户自己的 Windows 个性化：强调色取自系统 Accent Color（不再硬编码），
+  亮暗模式跟随系统；运行中修改 Windows 强调色 / 深浅色，应用即时跟随（UISettings 监听）
+- 动漫主题设计系统：纯色系统强调色按钮、Win11 设置风格卡片行（标题 + 描述 + 右侧控件）、
+  Fluent 字阶（页标题 28px / 正文 14px / 说明 12px）、圆角卡片、亮 / 暗双主题资源
 - 全屏图片查看器（上一张 / 下一张 / 保存 / 全屏），支持键盘导航与下一张预加载，浮动工具栏沉浸式浏览
 - 查看器页：适应屏幕 / 实际大小 / 拉伸填充 / 缩放（25%–400%，Ctrl+滚轮或 +/-）、空格换图、
   Ctrl+S 保存、F11 全屏、来源链接直达原帖，左下角作者与分辨率信息胶囊
@@ -30,10 +33,16 @@
 - 缩略图缓存（内存 LRU + 磁盘），重复加载画廊几乎零等待；主窗口标题栏与查看器工具栏显示当前图片缩略图
 - 并发下载限流、瞬时故障自动重试、可配置请求超时；批量下载按 CPU 核数并行铺开
 - 自动刷新（可配置间隔）
-- 系统代理自动检测（环境变量 + Windows 注册表），支持手动代理与直连
+- 系统代理自动检测（环境变量 + Windows 注册表），支持手动代理与直连；
+  自研代理隧道：支持 HTTP(S) CONNECT 与 **SOCKS5**（.NET 不原生支持 socks5://）、
+  代理认证（user:password@）与 no_proxy 旁路；自动检测的系统代理会先探测 SOCKS5、
+  协议不符回退 HTTP CONNECT，节点传输故障 / 假死超时再回退直连（手动指定代理则严格遵从）
+- Gelbooru 支持 API 凭据（user_id + api_key，设置页填写；2022-09 起官方停用匿名 API）
 - 设置持久化（JSON，`%LocalAppData%/AnimeDownloader/config.json`）
 - 设置页内置“检测源连通性”：逐个探测 9 个图源的直连与代理可达性，标出哪些源需要科学上网
 - 亮 / 暗 / 跟随系统主题，Win11 Mica 材质，窄窗口自适应导航
+- `tools/SourceSmoke` 联网冒烟测试工具：逐图源做探测 + 真实拉取 + 图片字节校验
+  （`dotnet run --project tools/SourceSmoke`），含 dmoe 图床、SOCKS5 隧道等专项探测子命令
 
 ## 构建 / Building
 
