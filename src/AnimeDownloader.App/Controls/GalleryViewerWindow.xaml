@@ -7,7 +7,11 @@
 
     <Grid x:Name="Root" KeyDown="OnWindowKeyDown"
           Background="{ThemeResource AppViewerBackgroundBrush}">
-        <Grid x:Name="ViewHost">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid x:Name="ViewHost" Grid.Row="0">
             <Image x:Name="ViewImage" Stretch="Uniform" />
             <ProgressRing x:Name="LoadingRing" Width="40" Height="40" IsActive="False"
                           Foreground="{ThemeResource AppAccentBrush}" />
@@ -20,66 +24,65 @@
             </StackPanel>
         </Grid>
 
-        <!-- 标签区（底部悬浮卡片，点击 chip 跳转到该标签的画廊视图） -->
-        <Border x:Name="TagsHost"
-                HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                Margin="18,0,0,78" MaxWidth="560"
-                Style="{StaticResource AppFloatingToolbarStyle}"
-                Padding="12,8" Visibility="Collapsed">
-            <StackPanel Spacing="4">
-                <TextBlock Text="标签（点击浏览该标签下的图片）"
-                           Style="{StaticResource AppSettingsDescStyle}" />
-                <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto">
-                    <ItemsControl x:Name="TagsList">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <controls:SimpleWrapPanel />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                    </ItemsControl>
-                </ScrollViewer>
-            </StackPanel>
-        </Border>
-
-        <!-- 浮动工具栏 -->
-        <Border x:Name="Toolbar" Style="{StaticResource AppFloatingToolbarStyle}"
-                HorizontalAlignment="Center" VerticalAlignment="Bottom"
-                Margin="0,0,0,18" Opacity="0.97">
-            <StackPanel Orientation="Horizontal" Spacing="2">
-                <Button x:Name="PrevButton" Style="{StaticResource AppIconButtonStyle}"
-                        Click="OnPrev" ToolTipService.ToolTip="上一张（←）">
-                    <FontIcon Glyph="&#xE76B;" FontSize="15" />
-                </Button>
-                <Border MinWidth="64" VerticalAlignment="Center">
-                    <TextBlock x:Name="IndexLabel" Text="1 / 1" FontSize="12.5" FontWeight="SemiBold"
-                               Foreground="{ThemeResource AppTextPrimaryBrush}"
-                               HorizontalAlignment="Center" />
-                </Border>
-                <Button x:Name="NextButton" Style="{StaticResource AppIconButtonStyle}"
-                        Click="OnNext" ToolTipService.ToolTip="下一张（→）">
-                    <FontIcon Glyph="&#xE76C;" FontSize="15" />
-                </Button>
-                <Border Width="1" Height="22" Margin="6,8" VerticalAlignment="Center"
-                        Background="{ThemeResource AppCardStrokeBrush}" />
-                <Border x:Name="WindowThumbBorder" Width="40" Height="40" CornerRadius="8"
-                        Background="{ThemeResource AppTagChipBrush}"
-                        BorderBrush="{ThemeResource AppCardStrokeBrush}"
-                        BorderThickness="1"
-                        VerticalAlignment="Center" Margin="0,0,4,0"
-                        Visibility="Collapsed">
-                    <Image x:Name="WindowThumb" Stretch="UniformToFill" />
-                </Border>
-                <Button x:Name="SaveButton" Style="{StaticResource AppIconButtonStyle}"
-                        Click="OnSave" ToolTipService.ToolTip="保存">
-                    <FontIcon Glyph="&#xE74E;" FontSize="15" />
-                </Button>
-                <Border Width="1" Height="22" Margin="6,8" VerticalAlignment="Center"
-                        Background="{ThemeResource AppCardStrokeBrush}" />
-                <Button x:Name="FullscreenButton" Style="{StaticResource AppIconButtonStyle}"
-                        Click="OnToggleFullscreen" ToolTipService.ToolTip="全屏（F11）">
-                    <FontIcon Glyph="&#xE740;" FontSize="15" />
-                </Button>
-            </StackPanel>
-        </Border>
+        <!-- 底部：标签栏（图片下方独立一栏，全屏时隐藏）+ 浮动工具栏 -->
+        <StackPanel Grid.Row="1" Spacing="6">
+            <Border x:Name="TagsHost"
+                    Margin="14,0,14,0" MaxHeight="132"
+                    Style="{StaticResource AppFloatingToolbarStyle}"
+                    Padding="12,8" Visibility="Collapsed"
+                    HorizontalAlignment="Stretch">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="标签（点击浏览该标签下的图片）"
+                               Style="{StaticResource AppSettingsDescStyle}" />
+                    <ScrollViewer MaxHeight="96" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="TagsList">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <controls:SimpleWrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+            <Border x:Name="Toolbar" Style="{StaticResource AppFloatingToolbarStyle}"
+                    HorizontalAlignment="Center" Opacity="0.97">
+                <StackPanel Orientation="Horizontal" Spacing="2">
+                    <Button x:Name="PrevButton" Style="{StaticResource AppIconButtonStyle}"
+                            Click="OnPrev" ToolTipService.ToolTip="上一张（←）">
+                        <FontIcon Glyph="&#xE76B;" FontSize="15" />
+                    </Button>
+                    <Border MinWidth="64" VerticalAlignment="Center">
+                        <TextBlock x:Name="IndexLabel" Text="1 / 1" FontSize="12.5" FontWeight="SemiBold"
+                                   Foreground="{ThemeResource AppTextPrimaryBrush}"
+                                   HorizontalAlignment="Center" />
+                    </Border>
+                    <Button x:Name="NextButton" Style="{StaticResource AppIconButtonStyle}"
+                            Click="OnNext" ToolTipService.ToolTip="下一张（→）">
+                        <FontIcon Glyph="&#xE76C;" FontSize="15" />
+                    </Button>
+                    <Border Width="1" Height="22" Margin="6,8" VerticalAlignment="Center"
+                            Background="{ThemeResource AppCardStrokeBrush}" />
+                    <Border x:Name="WindowThumbBorder" Width="40" Height="40" CornerRadius="8"
+                            Background="{ThemeResource AppTagChipBrush}"
+                            BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                            BorderThickness="1"
+                            VerticalAlignment="Center" Margin="0,0,4,0"
+                            Visibility="Collapsed">
+                        <Image x:Name="WindowThumb" Stretch="UniformToFill" />
+                    </Border>
+                    <Button x:Name="SaveButton" Style="{StaticResource AppIconButtonStyle}"
+                            Click="OnSave" ToolTipService.ToolTip="保存">
+                        <FontIcon Glyph="&#xE74E;" FontSize="15" />
+                    </Button>
+                    <Border Width="1" Height="22" Margin="6,8" VerticalAlignment="Center"
+                            Background="{ThemeResource AppCardStrokeBrush}" />
+                    <Button x:Name="FullscreenButton" Style="{StaticResource AppIconButtonStyle}"
+                            Click="OnToggleFullscreen" ToolTipService.ToolTip="全屏（F11）">
+                        <FontIcon Glyph="&#xE740;" FontSize="15" />
+                    </Button>
+                </StackPanel>
+            </Border>
+        </StackPanel>
     </Grid>
 </Window>

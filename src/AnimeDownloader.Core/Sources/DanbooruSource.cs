@@ -353,6 +353,12 @@ public sealed class DanbooruSource : ImageSourceBase, ITagSuggester
                 localized.ChineseName));
         }
 
+        if (suggestions.Count == 0)
+        {
+            // 联想接口不可用（网络 / 站点波动）时回退到本地热门标签表
+            return TagSuggesterFallback.LocalPrefix(prefix, limit);
+        }
+
         return suggestions;
     }
 

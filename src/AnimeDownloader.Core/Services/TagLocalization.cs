@@ -39,6 +39,39 @@ public static class TagLocalization
         return Table.TryGetValue(tag.Trim().ToLowerInvariant(), out entry);
     }
 
+    /// <summary>
+    /// 按前缀在本地热门标签表中联想候选（按帖子数降序）。
+    /// 用于图源联想接口不可用（无凭据 / 网络 / 站点不支持前缀查询）时的离线兜底。
+    /// </summary>
+    public static IReadOnlyList<TagLocalizationMatch> SearchByPrefix(string prefix, int limit)
+    {
+        var result = new List<TagLocalizationMatch>();
+        if (string.IsNullOrWhiteSpace(prefix) || limit <= 0)
+        {
+            return result;
+        }
+
+        var trimmed = prefix.Trim();
+        foreach (var pair in Table)
+        {
+            if (!pair.Key.StartsWith(trimmed, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            result.Add(new TagLocalizationMatch(pair.Key, pair.Value));
+            if (result.Count >= limit * 4)
+            {
+                break;
+            }
+        }
+
+        return result
+            .OrderByDescending(m => m.Entry.PostCount)
+            .Take(limit)
+            .ToList();
+    }
+
     private static Dictionary<string, TagLocalizationEntry> LoadEmbeddedTable()
     {
         var assembly = typeof(TagLocalization).Assembly;
@@ -76,3 +109,6 @@ public static class TagLocalization
 
 /// <summary>内嵌翻译表的条目。</summary>
 public readonly record struct TagLocalizationEntry(string ChineseName, int Category, long PostCount);
+
+/// <summary>本地前缀联想的一条结果。</summary>
+public sealed record TagLocalizationMatch(string Name, TagLocalizationEntry Entry);

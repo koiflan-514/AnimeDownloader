@@ -246,6 +246,9 @@ public sealed partial class GalleryPage : Page, IModePage
             BuildSuggestList(suggestions, related, word);
             PositionTagSuggestPopup();
             TagSuggestPopup.IsOpen = true;
+            // 弹层打开会抢占键盘焦点：立即把焦点还给输入框，保证连续输入不中断
+            TagBox.Focus(FocusState.Programmatic);
+            TagBox.SelectionStart = TagBox.Text.Length;
         }
         catch (OperationCanceledException)
         {
@@ -285,6 +288,8 @@ public sealed partial class GalleryPage : Page, IModePage
             IsChecked = existing.Contains(suggestion.Name),
             MinHeight = 32,
             Padding = new Thickness(6, 2, 6, 2),
+            // 点击候选项时把键盘焦点留在输入框，避免输入被打断
+            AllowFocusOnInteraction = false,
         };
 
         var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };

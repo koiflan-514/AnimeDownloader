@@ -139,14 +139,16 @@ public class TagFeaturesTests
     }
 
     [Fact]
-    public async Task Gelbooru_SuggestTags_RequiresCredentials()
+    public async Task Gelbooru_SuggestTags_WithoutCredentials_FallsBackToLocalTable()
     {
-        using var http = CreateHttp(_ => JsonResponse("""{"tag":[]}"""));
+        using var http = CreateHttp(_ => throw new InvalidOperationException("无凭据时不应发起在线联想"));
         var source = new GelbooruSource(http);
 
-        Assert.False(source.SupportsTagSuggestions);
+        Assert.True(source.SupportsTagSuggestions);
         var suggestions = await source.SuggestTagsAsync("hatsune");
-        Assert.Empty(suggestions);
+
+        Assert.NotEmpty(suggestions);
+        Assert.Contains(suggestions, s => s.Name == "hatsune_miku" && s.ChineseName is not null);
     }
 
     [Fact]
@@ -172,23 +174,17 @@ public class TagFeaturesTests
     }
 
     [Fact]
-    public async Task Safebooru_SuggestTags_NoCredentialsNeeded()
+    public async Task Safebooru_SuggestTags_UsesLocalPrefixTable()
     {
-        string? requestUrl = null;
-        using var http = CreateHttp(req =>
-        {
-            requestUrl = req.RequestUri!.ToString();
-            return JsonResponse("""{"tag":[{"name":"smile","count":80,"type":0}]}""");
-        });
+        // Safebooru 的 dapi tag 查询不支持通配符且 json 输出损坏，联想走本地表
+        using var http = CreateHttp(_ => throw new InvalidOperationException("Safebooru 联想不应发起网络请求"));
         var source = new SafebooruSource(http);
 
         var suggestions = await source.SuggestTagsAsync("smi");
 
-        var first = Assert.Single(suggestions);
-        Assert.Equal("smile", first.Name);
-        Assert.NotNull(requestUrl);
-        Assert.Contains("s=tag", requestUrl);
-        Assert.DoesNotContain("api_key", requestUrl);
+        Assert.NotEmpty(suggestions);
+        Assert.Contains(suggestions, s => s.Name == "smile" && s.ChineseName == "微笑");
+        Assert.All(suggestions, s => Assert.StartsWith("smi", s.Name, StringComparison.OrdinalIgnoreCase));
     }
 
     // ---------------- 相关标签 ----------------

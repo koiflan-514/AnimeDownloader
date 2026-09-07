@@ -488,6 +488,7 @@ public sealed partial class ViewerPage : Page, IModePage
     private void HideChrome()
     {
         ToolbarHeader.Visibility = Visibility.Collapsed;
+        TagsHost.Visibility = Visibility.Collapsed;
         FloatingToolbar.Visibility = Visibility.Collapsed;
         InfoChips.Visibility = Visibility.Collapsed;
         StatusBar.Visibility = Visibility.Collapsed;
@@ -502,6 +503,10 @@ public sealed partial class ViewerPage : Page, IModePage
         StatusBar.Visibility = Visibility.Visible;
         InfoChips.Visibility = (ArtistChip.Visibility == Visibility.Visible ||
                                 ResChip.Visibility == Visibility.Visible)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        // 标签区只在图片带标签时恢复显示
+        TagsHost.Visibility = _current is { } current && current.TagList.Count > 0
             ? Visibility.Visible
             : Visibility.Collapsed;
         ViewArea.CornerRadius = new CornerRadius(16);

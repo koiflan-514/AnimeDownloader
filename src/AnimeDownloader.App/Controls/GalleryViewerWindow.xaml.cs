@@ -25,6 +25,7 @@ public sealed partial class GalleryViewerWindow : Window
     private string? _nextUrl;
     private byte[]? _nextContent;
     private bool _isSaving;
+    private bool _hasTags;
     private int _windowThumbToken;
 
     public GalleryViewerWindow(MainWindow owner, IReadOnlyList<ImageItem> items, int index)
@@ -80,7 +81,8 @@ public sealed partial class GalleryViewerWindow : Window
     {
         TagsList.Items.Clear();
         var tags = item.TagList;
-        TagsHost.Visibility = tags.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        _hasTags = tags.Count > 0;
+        TagsHost.Visibility = _hasTags ? Visibility.Visible : Visibility.Collapsed;
         if (tags.Count == 0)
         {
             return;
@@ -315,6 +317,7 @@ public sealed partial class GalleryViewerWindow : Window
         {
             AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen);
             Toolbar.Visibility = Visibility.Collapsed;
+            TagsHost.Visibility = Visibility.Collapsed;
         }
     }
 
@@ -322,6 +325,10 @@ public sealed partial class GalleryViewerWindow : Window
     {
         AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Overlapped);
         Toolbar.Visibility = Visibility.Visible;
+        if (_hasTags)
+        {
+            TagsHost.Visibility = Visibility.Visible;
+        }
     }
 
     private async void OnSave(object sender, RoutedEventArgs e)

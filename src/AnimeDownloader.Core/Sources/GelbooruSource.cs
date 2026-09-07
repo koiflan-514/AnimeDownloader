@@ -275,7 +275,7 @@ public sealed class GelbooruSource : ImageSourceBase, ITagSuggester
     // ---------------- 标签联想（ITagSuggester，dapi tag 查询需要凭据） ----------------
 
     /// <inheritdoc />
-    public bool SupportsTagSuggestions => HasCredentials;
+    public bool SupportsTagSuggestions => true;
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<TagSuggestion>> SuggestTagsAsync(
@@ -284,50 +284,59 @@ public sealed class GelbooruSource : ImageSourceBase, ITagSuggester
         CancellationToken cancellationToken = default)
     {
         var prefix = input.Trim();
-        if (prefix.Length == 0 || limit <= 0 || !HasCredentials)
+        if (prefix.Length == 0 || limit <= 0)
         {
             return Array.Empty<TagSuggestion>();
         }
 
-        var data = await GetJsonAsync(ApiUrl, new Dictionary<string, string?>
+        var suggestions = new List<TagSuggestion>();
+        if (HasCredentials)
         {
-            ["page"] = "dapi",
-            ["s"] = "tag",
-            ["q"] = "index",
-            ["name_pattern"] = $"{prefix}*",
-            ["orderby"] = "count",
-            ["limit"] = Math.Clamp(limit, 1, 30).ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["json"] = "1",
-        }, cancellationToken).ConfigureAwait(false);
-        var nodes = data?["tag"]?.AsArray();
-        if (nodes is null)
-        {
-            return Array.Empty<TagSuggestion>();
-        }
-
-        var suggestions = new List<TagSuggestion>(nodes.Count);
-        foreach (var node in nodes)
-        {
-            var name = node?["name"]?.GetValue<string>();
-            if (string.IsNullOrEmpty(name))
+            var data = await GetJsonAsync(ApiUrl, new Dictionary<string, string?>
             {
-                continue;
+                ["page"] = "dapi",
+                ["s"] = "tag",
+                ["q"] = "index",
+                ["name_pattern"] = $"{prefix}*",
+                ["orderby"] = "count",
+                ["limit"] = Math.Clamp(limit, 1, 30).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["json"] = "1",
+            }, cancellationToken).ConfigureAwait(false);
+            var nodes = data?["tag"]?.AsArray();
+            if (nodes is null)
+            {
+                return TagSuggesterFallback.LocalPrefix(prefix, limit);
             }
 
-            var count = node?["count"]?.GetValue<long>();
-            // Gelbooru tag type：0=general 1=artist 2=copyright 3=character 4=meta
-            var typeValue = node?["type"]?.GetValue<int>();
-            TagCategory? category = typeValue switch
+            foreach (var node in nodes)
             {
-                1 => TagCategory.Artist,
-                2 => TagCategory.Copyright,
-                3 => TagCategory.Character,
-                4 => TagCategory.Meta,
-                0 => TagCategory.General,
-                _ => null,
-            };
-            TagLocalization.TryGet(name, out var localized);
-            suggestions.Add(new TagSuggestion(name, count, category, localized.ChineseName));
+                var name = node?["name"]?.GetValue<string>();
+                if (string.IsNullOrEmpty(name))
+                {
+                    continue;
+                }
+
+                var count = node?["count"]?.GetValue<long>();
+                // Gelbooru tag type：0=general 1=artist 2=copyright 3=character 4=meta
+                var typeValue = node?["type"]?.GetValue<int>();
+                TagCategory? category = typeValue switch
+                {
+                    1 => TagCategory.Artist,
+                    2 => TagCategory.Copyright,
+                    3 => TagCategory.Character,
+                    4 => TagCategory.Meta,
+                    0 => TagCategory.General,
+                    _ => null,
+                };
+                TagLocalization.TryGet(name, out var localized);
+                suggestions.Add(new TagSuggestion(name, count, category, localized.ChineseName));
+            }
+        }
+
+        if (suggestions.Count == 0)
+        {
+            // 无凭据或在线联想为空时回退到本地热门标签表
+            return TagSuggesterFallback.LocalPrefix(prefix, limit);
         }
 
         return suggestions;

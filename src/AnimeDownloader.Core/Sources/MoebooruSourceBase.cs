@@ -313,6 +313,12 @@ public abstract class MoebooruSourceBase : ImageSourceBase, ITagSuggester
             suggestions.Add(new TagSuggestion(name, count, category, localized.ChineseName));
         }
 
+        if (suggestions.Count == 0)
+        {
+            // 联想接口不可用时回退到本地热门标签表
+            return TagSuggesterFallback.LocalPrefix(prefix, limit);
+        }
+
         return suggestions;
     }
 

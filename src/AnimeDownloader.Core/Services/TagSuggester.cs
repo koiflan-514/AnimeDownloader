@@ -33,3 +33,38 @@ public interface ITagSuggester
         string tag,
         CancellationToken cancellationToken = default);
 }
+
+/// <summary>
+/// 联想的本地兜底：图源联想接口不可用（网络波动、无凭据、站点不支持前缀查询）时，
+/// 用内嵌热门标签表做前缀匹配，保证输入时始终有候选弹出。
+/// </summary>
+public static class TagSuggesterFallback
+{
+    /// <summary>按前缀在本地热门标签表中联想，按帖子数降序。</summary>
+    public static IReadOnlyList<TagSuggestion> LocalPrefix(string prefix, int limit)
+    {
+        var matches = TagLocalization.SearchByPrefix(prefix, Math.Clamp(limit, 1, 30));
+        var suggestions = new List<TagSuggestion>(matches.Count);
+        foreach (var match in matches)
+        {
+            suggestions.Add(new TagSuggestion(
+                match.Name,
+                match.Entry.PostCount,
+                FromInt(match.Entry.Category),
+                match.Entry.ChineseName));
+        }
+
+        return suggestions;
+    }
+
+    private static TagCategory? FromInt(int value) => value switch
+    {
+        0 => TagCategory.General,
+        1 => TagCategory.Artist,
+        2 => TagCategory.Circle,
+        3 => TagCategory.Copyright,
+        4 => TagCategory.Character,
+        5 => TagCategory.Meta,
+        _ => null,
+    };
+}

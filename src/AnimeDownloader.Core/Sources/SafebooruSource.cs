@@ -231,13 +231,16 @@ public sealed class SafebooruSource : ImageSourceBase, ITagSuggester
         return ext.Length is > 0 and <= 8 ? ext : null;
     }
 
-    // ---------------- 标签联想（ITagSuggester，dapi tag 查询无需凭据） ----------------
+    // ---------------- 标签联想（ITagSuggester） ----------------
 
     /// <inheritdoc />
     public bool SupportsTagSuggestions => true;
 
-    /// <inheritdoc />
-    public async Task<IReadOnlyList<TagSuggestion>> SuggestTagsAsync(
+    /// <summary>
+    /// Safebooru 的 dapi tag 查询不支持通配符前缀且 json=1 输出损坏（恒为空），
+    /// 因此联想直接使用内嵌热门标签表的本地前缀匹配（含中文译名与近似热度）。
+    /// </summary>
+    public Task<IReadOnlyList<TagSuggestion>> SuggestTagsAsync(
         string input,
         int limit = 15,
         CancellationToken cancellationToken = default)
@@ -245,50 +248,21 @@ public sealed class SafebooruSource : ImageSourceBase, ITagSuggester
         var prefix = input.Trim();
         if (prefix.Length == 0 || limit <= 0)
         {
-            return Array.Empty<TagSuggestion>();
+            return Task.FromResult<IReadOnlyList<TagSuggestion>>(Array.Empty<TagSuggestion>());
         }
 
-        var data = await GetJsonAsync(Endpoint, new Dictionary<string, string?>
+        var matches = TagLocalization.SearchByPrefix(prefix, Math.Clamp(limit, 1, 30));
+        var suggestions = new List<TagSuggestion>(matches.Count);
+        foreach (var match in matches)
         {
-            ["page"] = "dapi",
-            ["s"] = "tag",
-            ["q"] = "index",
-            ["name_pattern"] = $"{prefix}*",
-            ["orderby"] = "count",
-            ["limit"] = Math.Clamp(limit, 1, 30).ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["json"] = "1",
-        }, cancellationToken).ConfigureAwait(false);
-        var nodes = data?["tag"]?.AsArray();
-        if (nodes is null)
-        {
-            return Array.Empty<TagSuggestion>();
+            suggestions.Add(new TagSuggestion(
+                match.Name,
+                match.Entry.PostCount,
+                ParseCategory(match.Entry.Category),
+                match.Entry.ChineseName));
         }
 
-        var suggestions = new List<TagSuggestion>(nodes.Count);
-        foreach (var node in nodes)
-        {
-            var name = node?["name"]?.GetValue<string>();
-            if (string.IsNullOrEmpty(name))
-            {
-                continue;
-            }
-
-            var count = node?["count"]?.GetValue<long>();
-            var typeValue = node?["type"]?.GetValue<int>();
-            TagCategory? category = typeValue switch
-            {
-                1 => TagCategory.Artist,
-                2 => TagCategory.Copyright,
-                3 => TagCategory.Character,
-                4 => TagCategory.Meta,
-                0 => TagCategory.General,
-                _ => null,
-            };
-            TagLocalization.TryGet(name, out var localized);
-            suggestions.Add(new TagSuggestion(name, count, category, localized.ChineseName));
-        }
-
-        return suggestions;
+        return Task.FromResult<IReadOnlyList<TagSuggestion>>(suggestions);
     }
 
     /// <inheritdoc />
@@ -298,4 +272,14 @@ public sealed class SafebooruSource : ImageSourceBase, ITagSuggester
     {
         return Task.FromResult<IReadOnlyList<TagSuggestion>>(Array.Empty<TagSuggestion>());
     }
+
+    private static TagCategory? ParseCategory(int value) => value switch
+    {
+        1 => TagCategory.Artist,
+        2 => TagCategory.Copyright,
+        3 => TagCategory.Character,
+        4 => TagCategory.Meta,
+        0 => TagCategory.General,
+        _ => null,
+    };
 }
