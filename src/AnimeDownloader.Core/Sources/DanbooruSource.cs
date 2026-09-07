@@ -1,14 +1,15 @@
 using System.Text.Json.Nodes;
 using AnimeDownloader.Core.Models;
+using AnimeDownloader.Core.Services;
 
 namespace AnimeDownloader.Core.Sources;
 
 /// <summary>
 /// Danbooru 图源：https://danbooru.donmai.us（支持标签、随机与分页）。
 /// 与参考项目一致，对 Danbooru 平台的受限标签（shota/loli）进行下载端过滤，
-/// 并在标签输入时静默剔除。
+/// 并在标签输入时静默剔除。支持标签联想与相关标签推荐。
 /// </summary>
-public sealed class DanbooruSource : ImageSourceBase
+public sealed class DanbooruSource : ImageSourceBase, ITagSuggester
 {
     private const string Endpoint = "https://danbooru.donmai.us";
     private static readonly string[] ForbiddenTags = { "shota", "loli" };
@@ -232,7 +233,62 @@ public sealed class DanbooruSource : ImageSourceBase
             SourceLink: id is null ? null : $"{Endpoint}/posts/{id}",
             Id: id,
             Extension: extension,
-            Metadata: BuildMetadata(root, width, height));
+            Metadata: BuildMetadata(root, width, height),
+            Tags: ReadTags(post));
+    }
+
+    /// <summary>
+    /// 读取帖子的全部标签并附带类别：tag_string 为权威顺序，
+    /// 各分类串（artist/character/copyright/meta）用于建立 名称→类别 映射。
+    /// </summary>
+    private static IReadOnlyList<ImageTag> ReadTags(JsonNode? post)
+    {
+        var tagString = post?["tag_string"]?.GetValue<string>();
+        if (string.IsNullOrWhiteSpace(tagString))
+        {
+            return Array.Empty<ImageTag>();
+        }
+
+        var categories = new Dictionary<string, TagCategory>(StringComparer.Ordinal);
+        AddCategory(categories, post, "tag_string_artist", TagCategory.Artist);
+        AddCategory(categories, post, "tag_string_character", TagCategory.Character);
+        AddCategory(categories, post, "tag_string_copyright", TagCategory.Copyright);
+        AddCategory(categories, post, "tag_string_meta", TagCategory.Meta);
+
+        var tags = new List<ImageTag>();
+        foreach (var name in tagString.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (name.Length == 0)
+            {
+                continue;
+            }
+
+            categories.TryGetValue(name, out var category);
+            tags.Add(new ImageTag(name, category));
+        }
+
+        return tags;
+    }
+
+    private static void AddCategory(
+        Dictionary<string, TagCategory> target,
+        JsonNode? post,
+        string fieldName,
+        TagCategory category)
+    {
+        var value = post?[fieldName]?.GetValue<string>();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        foreach (var name in value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (name.Length > 0)
+            {
+                target.TryAdd(name, category);
+            }
+        }
     }
 
     private static string? InferExtension(string url)
@@ -247,4 +303,110 @@ public sealed class DanbooruSource : ImageSourceBase
         var ext = path[(dot + 1)..];
         return ext.Length is > 0 and <= 8 ? ext : null;
     }
+
+    // ---------------- 标签联想与相关标签（ITagSuggester） ----------------
+
+    /// <inheritdoc />
+    public bool SupportsTagSuggestions => true;
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<TagSuggestion>> SuggestTagsAsync(
+        string input,
+        int limit = 15,
+        CancellationToken cancellationToken = default)
+    {
+        var prefix = input.Trim();
+        if (prefix.Length == 0 || limit <= 0)
+        {
+            return Array.Empty<TagSuggestion>();
+        }
+
+        var data = await GetJsonAsync($"{Endpoint}/tags.json", new Dictionary<string, string?>
+        {
+            ["search[name_matches]"] = $"{prefix}*",
+            ["search[order]"] = "count",
+            ["search[is_deprecated]"] = "false",
+            ["limit"] = Math.Clamp(limit, 1, 30).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        }, cancellationToken).ConfigureAwait(false);
+        var nodes = data?.AsArray();
+        if (nodes is null)
+        {
+            return Array.Empty<TagSuggestion>();
+        }
+
+        var suggestions = new List<TagSuggestion>(nodes.Count);
+        foreach (var node in nodes)
+        {
+            var name = node?["name"]?.GetValue<string>();
+            if (string.IsNullOrEmpty(name))
+            {
+                continue;
+            }
+
+            var count = node?["post_count"]?.GetValue<long>();
+            var category = ParseCategory(node?["category"]?.GetValue<int>());
+            TagLocalization.TryGet(name, out var localized);
+            suggestions.Add(new TagSuggestion(
+                name,
+                count,
+                category,
+                localized.ChineseName));
+        }
+
+        return suggestions;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<TagSuggestion>> GetRelatedTagsAsync(
+        string tag,
+        CancellationToken cancellationToken = default)
+    {
+        var name = tag.Trim();
+        if (name.Length == 0)
+        {
+            return Array.Empty<TagSuggestion>();
+        }
+
+        var data = await GetJsonAsync($"{Endpoint}/related_tag.json", new Dictionary<string, string?>
+        {
+            ["search[tag_query]"] = name,
+            ["limit"] = "12",
+        }, cancellationToken).ConfigureAwait(false);
+        var nodes = data?["related_tags"]?.AsArray();
+        if (nodes is null)
+        {
+            return Array.Empty<TagSuggestion>();
+        }
+
+        var suggestions = new List<TagSuggestion>(nodes.Count);
+        foreach (var node in nodes)
+        {
+            // 形如 {"tag": {"name": ..., "post_count": ..., "category": ...}, ...}
+            var tagNode = node?["tag"] ?? node;
+            var relatedName = tagNode?["name"]?.GetValue<string>();
+            if (string.IsNullOrEmpty(relatedName) ||
+                relatedName.Equals(name, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var count = tagNode?["post_count"]?.GetValue<long>();
+            var category = ParseCategory(tagNode?["category"]?.GetValue<int>());
+            TagLocalization.TryGet(relatedName, out var localized);
+            suggestions.Add(new TagSuggestion(relatedName, count, category, localized.ChineseName));
+        }
+
+        return suggestions;
+    }
+
+    private static TagCategory? ParseCategory(int? value) => value switch
+    {
+        0 => TagCategory.General,
+        1 => TagCategory.Artist,
+        2 => TagCategory.Circle,
+        3 => TagCategory.Copyright,
+        4 => TagCategory.Character,
+        5 => TagCategory.Meta,
+        _ => null,
+    };
 }

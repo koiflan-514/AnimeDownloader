@@ -2,11 +2,13 @@
     x:Class="AnimeDownloader.App.Views.ViewerPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:AnimeDownloader.App.Controls"
     IsTabStop="True"
     KeyDown="OnPageKeyDown">
 
     <Grid x:Name="Root" Padding="{StaticResource PagePadding}" RowSpacing="12">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
@@ -24,13 +26,43 @@
                            TextWrapping="NoWrap" MaxWidth="640"
                            TextTrimming="CharacterEllipsis" />
             </StackPanel>
-            <HyperlinkButton x:Name="SourceLinkButton" Grid.Column="1" Content="打开来源"
-                             Visibility="Collapsed" Click="OnOpenSource"
-                             VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4"
+                        VerticalAlignment="Center">
+                <HyperlinkButton x:Name="SourceLinkButton" Content="打开来源"
+                                 Visibility="Collapsed" Click="OnOpenSource" />
+                <HyperlinkButton x:Name="SaucenaoButton" Content="SauceNAO 反搜"
+                                 Visibility="Collapsed" Click="OnOpenSaucenao"
+                                 ToolTipService.ToolTip="以图搜图：在 SauceNAO 查找这张图的来源" />
+                <HyperlinkButton x:Name="IqdbButton" Content="IQDB 反搜"
+                                 Visibility="Collapsed" Click="OnOpenIqdb"
+                                 ToolTipService.ToolTip="以图搜图：在 IQDB 查找缩略图与更高清版本" />
+                <Button x:Name="CopyLinkButton" Style="{StaticResource AppIconButtonStyle}"
+                        Visibility="Collapsed" Click="OnCopyImageLink"
+                        ToolTipService.ToolTip="复制图片直链">
+                    <FontIcon Glyph="&#xE8C8;" FontSize="14" />
+                </Button>
+            </StackPanel>
         </Grid>
 
+        <!-- ============ 标签区（点击跳转到该标签的画廊视图） ============ -->
+        <Border x:Name="TagsHost" Grid.Row="1"
+                Style="{StaticResource AppCardBorderStyle}"
+                Padding="12,10" Visibility="Collapsed">
+            <StackPanel Spacing="6">
+                <TextBlock Text="标签（点击浏览该标签下的图片）"
+                           Style="{StaticResource AppSettingsDescStyle}" />
+                <ItemsControl x:Name="TagsList">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <controls:SimpleWrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
         <!-- ============ 沉浸式查看区 ============ -->
-        <Grid x:Name="ViewArea" Grid.Row="1"
+        <Grid x:Name="ViewArea" Grid.Row="2"
               Background="{ThemeResource AppViewerBackgroundBrush}"
               CornerRadius="{StaticResource PanelCornerRadius}"
               DoubleTapped="OnViewAreaDoubleTapped">
@@ -128,7 +160,7 @@
         </Grid>
 
         <!-- ============ 状态栏 ============ -->
-        <Border x:Name="StatusBar" Grid.Row="2" Style="{StaticResource AppStatusBarStyle}">
+        <Border x:Name="StatusBar" Grid.Row="3" Style="{StaticResource AppStatusBarStyle}">
             <Grid ColumnSpacing="8">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />

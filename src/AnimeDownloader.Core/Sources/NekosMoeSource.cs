@@ -62,7 +62,30 @@ public sealed class NekosMoeSource : ImageSourceBase
             Artist: image["artist"]?.GetValue<string>(),
             SourceLink: $"https://nekos.moe/post/{id}",
             Id: id,
-            Metadata: new Dictionary<string, object?> { ["raw"] = data?.ToJsonString() });
+            Metadata: new Dictionary<string, object?> { ["raw"] = data?.ToJsonString() },
+            Tags: ReadTags(image));
+    }
+
+    /// <summary>读取 nekos.moe 的 tags 数组（元素为字符串）。</summary>
+    private static IReadOnlyList<ImageTag> ReadTags(JsonNode? image)
+    {
+        var nodes = image?["tags"]?.AsArray();
+        if (nodes is null || nodes.Count == 0)
+        {
+            return Array.Empty<ImageTag>();
+        }
+
+        var tags = new List<ImageTag>(nodes.Count);
+        foreach (var node in nodes)
+        {
+            var name = node?.GetValue<string>();
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                tags.Add(new ImageTag(name));
+            }
+        }
+
+        return tags;
     }
 
     /// <inheritdoc />
@@ -97,7 +120,8 @@ public sealed class NekosMoeSource : ImageSourceBase
                 Url: $"https://nekos.moe/image/{id}",
                 Artist: node?["artist"]?.GetValue<string>(),
                 SourceLink: $"https://nekos.moe/post/{id}",
-                Id: id));
+                Id: id,
+                Tags: ReadTags(node)));
             if (items.Count >= count)
             {
                 break;

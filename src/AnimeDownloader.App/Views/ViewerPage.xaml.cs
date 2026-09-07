@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
 using Windows.System;
 
 namespace AnimeDownloader.App.Views;
@@ -93,6 +94,10 @@ public sealed partial class ViewerPage : Page, IModePage
         _zoom = 1f;
         ZoomLabel.Text = "100%";
         SourceLinkButton.Visibility = Visibility.Collapsed;
+        SaucenaoButton.Visibility = Visibility.Collapsed;
+        IqdbButton.Visibility = Visibility.Collapsed;
+        CopyLinkButton.Visibility = Visibility.Collapsed;
+        TagsHost.Visibility = Visibility.Collapsed;
         InfoChips.Visibility = Visibility.Collapsed;
         StatusText.Text = "加载中…";
         SetStatusDot(busy: true);
@@ -139,6 +144,12 @@ public sealed partial class ViewerPage : Page, IModePage
             SourceLinkButton.Visibility = string.IsNullOrEmpty(item.SourceLink)
                 ? Visibility.Collapsed
                 : Visibility.Visible;
+
+            // 增值功能：以图搜图 / 复制直链（原图 URL 有效时可用）
+            CopyLinkButton.Visibility = Visibility.Visible;
+            SaucenaoButton.Visibility = Visibility.Visible;
+            IqdbButton.Visibility = Visibility.Visible;
+            PopulateTags(item);
 
             ArtistText.Text = item.Artist ?? string.Empty;
             ArtistChip.Visibility = string.IsNullOrEmpty(item.Artist)
@@ -193,6 +204,136 @@ public sealed partial class ViewerPage : Page, IModePage
             ? "AppStatusDotErrorStyle"
             : busy ? "AppStatusDotBusyStyle" : "AppStatusDotOkStyle";
         StatusDot.Style = (Style)Application.Current.Resources[key];
+    }
+
+    // ---------------- 标签区 ----------------
+
+    /// <summary>填充当前图片的全部标签 chip；点击 chip 跳转到该标签的画廊视图。</summary>
+    private void PopulateTags(ImageItem item)
+    {
+        TagsList.Items.Clear();
+        var tags = item.TagList;
+        TagsHost.Visibility = tags.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (tags.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var tag in tags)
+        {
+            var hasChinese = TagLocalization.TryGet(tag.Name, out var localized);
+            var chip = new Button { Style = (Style)Application.Current.Resources["AppTagChipButtonStyle"] };
+            var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+
+            var dotColor = tag.Category switch
+            {
+                TagCategory.Artist => Windows.UI.Color.FromArgb(255, 0xE8, 0xA2, 0x3D),
+                TagCategory.Character => Windows.UI.Color.FromArgb(255, 0x35, 0xC0, 0x75),
+                TagCategory.Copyright => Windows.UI.Color.FromArgb(255, 0x9B, 0x59, 0xD0),
+                TagCategory.Meta => Windows.UI.Color.FromArgb(255, 0xE5, 0x48, 0x4D),
+                TagCategory.Circle => Windows.UI.Color.FromArgb(255, 0x4C, 0xA6, 0xC9),
+                _ => (Windows.UI.Color?)null,
+            };
+            if (dotColor is { } color)
+            {
+                panel.Children.Add(new Ellipse
+                {
+                    Width = 7,
+                    Height = 7,
+                    Fill = new SolidColorBrush(color),
+                    VerticalAlignment = VerticalAlignment.Center,
+                });
+            }
+
+            var parts = new List<string>();
+            if (hasChinese)
+            {
+                parts.Add(localized.ChineseName);
+            }
+
+            parts.Add(tag.Name);
+            panel.Children.Add(new TextBlock { Text = string.Join(' ', parts), TextTrimming = TextTrimming.CharacterEllipsis });
+            chip.Content = panel;
+
+            var tooltipLines = new List<string> { tag.Name };
+            if (hasChinese)
+            {
+                tooltipLines.Insert(0, $"中文：{localized.ChineseName}");
+            }
+
+            if (tag.Category is { } category)
+            {
+                tooltipLines.Add($"类别：{CategoryDisplayName(category)}");
+            }
+
+            ToolTipService.SetToolTip(chip, string.Join('\n', tooltipLines));
+            var tagName = tag.Name;
+            chip.Click += (_, _) => _owner?.NavigateToTagView(tagName);
+            TagsList.Items.Add(chip);
+        }
+    }
+
+    private static string CategoryDisplayName(TagCategory category) => category switch
+    {
+        TagCategory.Artist => "画师",
+        TagCategory.Character => "角色",
+        TagCategory.Copyright => "作品",
+        TagCategory.Meta => "元数据",
+        TagCategory.Circle => "社团",
+        _ => "通用",
+    };
+
+    // ---------------- 增值功能：复制直链 / 以图搜图 ----------------
+
+    private void OnCopyImageLink(object sender, RoutedEventArgs e)
+    {
+        if (_current is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var package = new Windows.ApplicationModel.DataTransfer.DataPackage
+            {
+                RequestedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.Copy,
+            };
+            package.SetText(_current.Url);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
+            StatusText.Text = "已复制图片直链";
+            SetStatusDot();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"复制失败：{ex.Message}";
+        }
+    }
+
+    private void OnOpenSaucenao(object sender, RoutedEventArgs e) =>
+        OpenReverseSearch("https://saucenao.com/search.php?url=");
+
+    private void OnOpenIqdb(object sender, RoutedEventArgs e) =>
+        OpenReverseSearch("https://iqdb.org/?url=");
+
+    private async void OpenReverseSearch(string baseUrl)
+    {
+        if (_current is null)
+        {
+            return;
+        }
+
+        var url = baseUrl + Uri.EscapeDataString(_current.Url);
+        try
+        {
+            _ = await Launcher.LaunchUriAsync(new Uri(url));
+            StatusText.Text = "已在浏览器打开反搜";
+            SetStatusDot();
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"打开反搜失败：{ex.Message}";
+            SetStatusDot(error: true);
+        }
     }
 
     private void OnRefresh(object sender, RoutedEventArgs e) => _ = LoadRandomAsync();

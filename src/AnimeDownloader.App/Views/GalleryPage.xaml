@@ -58,7 +58,8 @@
                                      Background="Transparent" FontSize="12.5"
                                      PlaceholderText="输入标签搜索（回车应用）"
                                      VerticalAlignment="Center"
-                                     KeyDown="OnTagBoxKeyDown" />
+                                     KeyDown="OnTagBoxKeyDown"
+                                     TextChanged="OnTagBoxTextChanged" />
                             <Button x:Name="TagApplyButton" Grid.Column="2"
                                     Style="{StaticResource AppSmallIconButtonStyle}"
                                     Click="OnTagApply"
@@ -85,6 +86,25 @@
                     </Border>
                 </StackPanel>
             </ScrollViewer>
+
+            <!-- 标签联想弹层：复选框多选智能提示（含中文译名 / 热度 / 类别 / 相关标签） -->
+            <Popup x:Name="TagSuggestPopup" IsLightDismissEnabled="True">
+                <Border Style="{StaticResource AppCardBorderStyle}"
+                        Width="440" MaxHeight="380" Padding="8">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="4" MinWidth="416">
+                            <TextBlock x:Name="SuggestHeaderText"
+                                       Text="标签联想（勾选加入搜索）"
+                                       Style="{StaticResource AppSettingsDescStyle}" Margin="6,2" />
+                            <ItemsControl x:Name="SuggestList" />
+                            <TextBlock x:Name="RelatedHeaderText" Text="相关标签"
+                                       Style="{StaticResource AppSettingsDescStyle}" Margin="6,6,6,2"
+                                       Visibility="Collapsed" />
+                            <ItemsControl x:Name="RelatedList" />
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Popup>
 
             <!-- 第 3 行：工具栏（窄窗口横向滚动，按钮始终完整显示） -->
             <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto"

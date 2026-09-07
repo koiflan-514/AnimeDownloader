@@ -406,4 +406,17 @@
         <Setter Property="Foreground" Value="{ThemeResource AppTextSecondaryBrush}" />
         <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
+
+    <!-- 可点击的标签 chip（查看器标签区） -->
+    <Style x:Key="AppTagChipButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="{ThemeResource AppTagChipBrush}" />
+        <Setter Property="Foreground" Value="{ThemeResource AppTextPrimaryBrush}" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="10,4" />
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="{ThemeResource AppCardStrokeBrush}" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+    </Style>
 </ResourceDictionary>

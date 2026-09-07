@@ -98,15 +98,16 @@ public class SourceFixAndProxyTests
         });
         var source = new GelbooruSource(http)
         {
-            UserId = "1234567",
-            ApiKey = "secret-key",
+            // 单元测试用的占位值，仅验证查询串拼装逻辑
+            UserId = "000000000",
+            ApiKey = new string('0', 8),
         };
 
         await source.GetImagesAsync(NsfwMode.BlockNsfw, 1);
 
         Assert.NotNull(requestUrl);
-        Assert.Contains("user_id=1234567", requestUrl);
-        Assert.Contains("api_key=secret-key", requestUrl);
+        Assert.Contains("user_id=000000000", requestUrl);
+        Assert.Contains("api_key=00000000", requestUrl);
     }
 
     [Fact]
@@ -127,14 +128,14 @@ public class SourceFixAndProxyTests
     public void Gelbooru_ProbeUrl_IncludesApiParameters()
     {
         using var http = CreateHttp(_ => JsonResponse("{}"));
-        var source = new GelbooruSource(http) { UserId = "42", ApiKey = "k" };
+        var source = new GelbooruSource(http) { UserId = "000000042", ApiKey = new string('0', 8) };
 
         var probeUrl = source.ProbeUrl;
 
         Assert.NotNull(probeUrl);
         Assert.Contains("page=dapi", probeUrl);
-        Assert.Contains("user_id=42", probeUrl);
-        Assert.Contains("api_key=k", probeUrl);
+        Assert.Contains("user_id=000000042", probeUrl);
+        Assert.Contains("api_key=00000000", probeUrl);
     }
 
     // ---------------- 代理方案与 no_proxy 旁路 ----------------

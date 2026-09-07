@@ -1,0 +1,35 @@
+using AnimeDownloader.Core.Models;
+
+namespace AnimeDownloader.Core.Services;
+
+/// <summary>标签联想 / 相关标签的单条结果。</summary>
+/// <param name="Name">标签原始名（提交查询时使用）。</param>
+/// <param name="PostCount">该标签的帖子数（可能为 null）。</param>
+/// <param name="Category">标签类别（图源提供时填充）。</param>
+/// <param name="ChineseName">中文译名（内嵌热门标签表命中时填充）。</param>
+public sealed record TagSuggestion(
+    string Name,
+    long? PostCount = null,
+    TagCategory? Category = null,
+    string? ChineseName = null);
+
+/// <summary>
+/// 支持标签联想的图源可选实现的接口：输入前缀 → 候选标签（含热度与类别），
+/// 以及某标签的相关标签推荐（Danbooru / Moebooru 系提供）。
+/// </summary>
+public interface ITagSuggester
+{
+    /// <summary>图源是否提供标签联想（还取决于凭据等运行时条件时也应如实反映）。</summary>
+    bool SupportsTagSuggestions { get; }
+
+    /// <summary>按输入前缀联想候选标签，按热度排序。</summary>
+    Task<IReadOnlyList<TagSuggestion>> SuggestTagsAsync(
+        string input,
+        int limit = 15,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>返回与指定标签相关的标签；图源不支持时返回空列表。</summary>
+    Task<IReadOnlyList<TagSuggestion>> GetRelatedTagsAsync(
+        string tag,
+        CancellationToken cancellationToken = default);
+}

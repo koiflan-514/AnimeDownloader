@@ -10,6 +10,7 @@ namespace AnimeDownloader.Core.Models;
 /// <param name="Id">图源内的稳定标识（如 post id / pixiv pid），用于文件名建议。</param>
 /// <param name="Extension">图片扩展名（不含点，可能为 null）。</param>
 /// <param name="Metadata">图源返回的原始 JSON 元数据，供展示与扩展使用。</param>
+/// <param name="Tags">图片携带的全部标签（图源不提供时为空列表）。</param>
 public sealed record ImageItem(
     string Url,
     string? ThumbnailUrl = null,
@@ -17,8 +18,12 @@ public sealed record ImageItem(
     string? SourceLink = null,
     string? Id = null,
     string? Extension = null,
-    IReadOnlyDictionary<string, object?>? Metadata = null)
+    IReadOnlyDictionary<string, object?>? Metadata = null,
+    IReadOnlyList<ImageTag>? Tags = null)
 {
+    /// <summary>图片的全部标签；图源未提供时为空列表（null 安全）。</summary>
+    public IReadOnlyList<ImageTag> TagList => Tags ?? Array.Empty<ImageTag>();
+
     /// <summary>
     /// 图片原始分辨率（宽 × 高）。图源解析时写入 Metadata 的 "width"/"height" 键；
     /// 未知时返回 null，UI 据此决定是否显示分辨率徽章。

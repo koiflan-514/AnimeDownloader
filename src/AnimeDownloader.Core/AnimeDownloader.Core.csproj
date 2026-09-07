@@ -10,4 +10,8 @@
     <InternalsVisibleTo Include="AnimeDownloader.Core.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\tag_zh.json" />
+  </ItemGroup>
+
 </Project>

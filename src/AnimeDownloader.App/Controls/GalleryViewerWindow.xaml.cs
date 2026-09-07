@@ -3,6 +3,7 @@ using AnimeDownloader.Core.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Graphics;
 using Windows.System;
@@ -68,10 +69,83 @@ public sealed partial class GalleryViewerWindow : Window
         PrevButton.IsEnabled = _index > 0;
         NextButton.IsEnabled = _index < _items.Count - 1;
         _owner.SetHeaderThumbnail(_items[_index]);
+        PopulateTags(_items[_index]);
         _ = LoadWindowThumbAsync(_items[_index]);
         _ = LoadImageAsync(_items[_index].Url);
         _ = PreloadNextAsync();
     }
+
+    /// <summary>填充当前图片的全部标签 chip；点击跳转到该标签的画廊视图。</summary>
+    private void PopulateTags(ImageItem item)
+    {
+        TagsList.Items.Clear();
+        var tags = item.TagList;
+        TagsHost.Visibility = tags.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (tags.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var tag in tags)
+        {
+            var hasChinese = TagLocalization.TryGet(tag.Name, out var localized);
+            var chip = new Button { Style = (Style)Application.Current.Resources["AppTagChipButtonStyle"] };
+            var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+            if (tag.Category is { } category)
+            {
+                panel.Children.Add(new Microsoft.UI.Xaml.Shapes.Ellipse
+                {
+                    Width = 7,
+                    Height = 7,
+                    Fill = new SolidColorBrush(CategoryColor(category)),
+                    VerticalAlignment = VerticalAlignment.Center,
+                });
+            }
+
+            var parts = new List<string>();
+            if (hasChinese)
+            {
+                parts.Add(localized.ChineseName);
+            }
+
+            parts.Add(tag.Name);
+            panel.Children.Add(new TextBlock { Text = string.Join(' ', parts) });
+            chip.Content = panel;
+
+            var tooltipLines = new List<string>();
+            if (hasChinese)
+            {
+                tooltipLines.Add($"中文：{localized.ChineseName}");
+            }
+
+            if (tag.Category is { } cat)
+            {
+                tooltipLines.Add($"类别：{cat}");
+            }
+
+            ToolTipService.SetToolTip(chip, string.Join('\n', tooltipLines));
+            var tagName = tag.Name;
+            chip.Click += (_, _) => CloseAndNavigate(tagName);
+            TagsList.Items.Add(chip);
+        }
+    }
+
+    /// <summary>关闭查看器窗口并让主窗口跳转到该标签视图。</summary>
+    private void CloseAndNavigate(string tagName)
+    {
+        Close();
+        _owner.NavigateToTagView(tagName);
+    }
+
+    private static Windows.UI.Color CategoryColor(TagCategory category) => category switch
+    {
+        TagCategory.Artist => Windows.UI.Color.FromArgb(255, 0xE8, 0xA2, 0x3D),
+        TagCategory.Character => Windows.UI.Color.FromArgb(255, 0x35, 0xC0, 0x75),
+        TagCategory.Copyright => Windows.UI.Color.FromArgb(255, 0x9B, 0x59, 0xD0),
+        TagCategory.Meta => Windows.UI.Color.FromArgb(255, 0xE5, 0x48, 0x4D),
+        TagCategory.Circle => Windows.UI.Color.FromArgb(255, 0x4C, 0xA6, 0xC9),
+        _ => Windows.UI.Color.FromArgb(255, 0x80, 0x80, 0x80),
+    };
 
     private async Task LoadWindowThumbAsync(ImageItem item)
     {

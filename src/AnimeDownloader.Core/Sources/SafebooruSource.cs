@@ -1,13 +1,14 @@
 using System.Text.Json.Nodes;
 using AnimeDownloader.Core.Models;
+using AnimeDownloader.Core.Services;
 
 namespace AnimeDownloader.Core.Sources;
 
 /// <summary>
 /// Safebooru 图源：https://safebooru.org（仅全年龄内容，支持标签与分页；
-/// 分页参数 pid 为 0 基，对应参考项目实现）。
+/// 分页参数 pid 为 0 基，对应参考项目实现）。支持标签联想（dapi tag 查询）。
 /// </summary>
-public sealed class SafebooruSource : ImageSourceBase
+public sealed class SafebooruSource : ImageSourceBase, ITagSuggester
 {
     private const string Endpoint = "https://safebooru.org/index.php";
     private const int RandomFetchLimit = 100;
@@ -192,7 +193,29 @@ public sealed class SafebooruSource : ImageSourceBase
             SourceLink: id is null ? null : $"https://safebooru.org/index.php?page=post&s=view&id={id}",
             Id: id,
             Extension: extension,
-            Metadata: BuildMetadata(root, width, height));
+            Metadata: BuildMetadata(root, width, height),
+            Tags: ReadTags(post));
+    }
+
+    /// <summary>读取帖子全部标签（tags 为空格分隔字符串）。</summary>
+    private static IReadOnlyList<ImageTag> ReadTags(JsonNode? post)
+    {
+        var tagString = post?["tags"]?.GetValue<string>();
+        if (string.IsNullOrWhiteSpace(tagString))
+        {
+            return Array.Empty<ImageTag>();
+        }
+
+        var tags = new List<ImageTag>();
+        foreach (var name in tagString.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (name.Length > 0)
+            {
+                tags.Add(new ImageTag(name));
+            }
+        }
+
+        return tags;
     }
 
     private static string? InferExtension(string url)
@@ -206,5 +229,73 @@ public sealed class SafebooruSource : ImageSourceBase
 
         var ext = path[(dot + 1)..];
         return ext.Length is > 0 and <= 8 ? ext : null;
+    }
+
+    // ---------------- 标签联想（ITagSuggester，dapi tag 查询无需凭据） ----------------
+
+    /// <inheritdoc />
+    public bool SupportsTagSuggestions => true;
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<TagSuggestion>> SuggestTagsAsync(
+        string input,
+        int limit = 15,
+        CancellationToken cancellationToken = default)
+    {
+        var prefix = input.Trim();
+        if (prefix.Length == 0 || limit <= 0)
+        {
+            return Array.Empty<TagSuggestion>();
+        }
+
+        var data = await GetJsonAsync(Endpoint, new Dictionary<string, string?>
+        {
+            ["page"] = "dapi",
+            ["s"] = "tag",
+            ["q"] = "index",
+            ["name_pattern"] = $"{prefix}*",
+            ["orderby"] = "count",
+            ["limit"] = Math.Clamp(limit, 1, 30).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["json"] = "1",
+        }, cancellationToken).ConfigureAwait(false);
+        var nodes = data?["tag"]?.AsArray();
+        if (nodes is null)
+        {
+            return Array.Empty<TagSuggestion>();
+        }
+
+        var suggestions = new List<TagSuggestion>(nodes.Count);
+        foreach (var node in nodes)
+        {
+            var name = node?["name"]?.GetValue<string>();
+            if (string.IsNullOrEmpty(name))
+            {
+                continue;
+            }
+
+            var count = node?["count"]?.GetValue<long>();
+            var typeValue = node?["type"]?.GetValue<int>();
+            TagCategory? category = typeValue switch
+            {
+                1 => TagCategory.Artist,
+                2 => TagCategory.Copyright,
+                3 => TagCategory.Character,
+                4 => TagCategory.Meta,
+                0 => TagCategory.General,
+                _ => null,
+            };
+            TagLocalization.TryGet(name, out var localized);
+            suggestions.Add(new TagSuggestion(name, count, category, localized.ChineseName));
+        }
+
+        return suggestions;
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<TagSuggestion>> GetRelatedTagsAsync(
+        string tag,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult<IReadOnlyList<TagSuggestion>>(Array.Empty<TagSuggestion>());
     }
 }

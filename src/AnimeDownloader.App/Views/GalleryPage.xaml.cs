@@ -4,6 +4,7 @@ using AnimeDownloader.Core.Sources;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Windows.System;
 using Windows.Storage.Pickers;
 
@@ -152,7 +153,16 @@ public sealed partial class GalleryPage : Page, IModePage
         }
 
         var tags = _currentSource.Tags ?? string.Empty;
-        TagBox.Text = tags;
+        _suppressSuggestEvents = true;
+        try
+        {
+            TagBox.Text = tags;
+        }
+        finally
+        {
+            _suppressSuggestEvents = false;
+        }
+
         var hasTags = !string.IsNullOrWhiteSpace(tags);
         TagChip.Visibility = hasTags ? Visibility.Visible : Visibility.Collapsed;
         TagChipText.Text = hasTags ? $"标签：{tags}" : string.Empty;
@@ -173,6 +183,276 @@ public sealed partial class GalleryPage : Page, IModePage
 
     private void OnClearTag(object sender, RoutedEventArgs e) => ApplyTags(string.Empty);
 
+    // ---------------- 标签联想（复选框智能提示） ----------------
+
+    private CancellationTokenSource? _suggestCts;
+    private bool _suppressSuggestEvents;
+
+    /// <summary>输入变化：防抖后按最后一个词查询联想与相关标签。</summary>
+    private void OnTagBoxTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_owner is null || _suppressSuggestEvents || _currentSource is not ITagSuggester suggester)
+        {
+            return;
+        }
+
+        if (!suggester.SupportsTagSuggestions)
+        {
+            return;
+        }
+
+        _suggestCts?.Cancel();
+        _suggestCts = new CancellationTokenSource(TimeSpan.FromSeconds(12));
+        _ = UpdateSuggestionsAsync(suggester, TagBox.Text, _suggestCts.Token);
+    }
+
+    private async Task UpdateSuggestionsAsync(ITagSuggester suggester, string text, CancellationToken ct)
+    {
+        var word = LastWord(text);
+        if (word.Length == 0)
+        {
+            TagSuggestPopup.IsOpen = false;
+            return;
+        }
+
+        try
+        {
+            var suggestions = await suggester.SuggestTagsAsync(word, 12, ct).ConfigureAwait(true);
+            IReadOnlyList<TagSuggestion> related = Array.Empty<TagSuggestion>();
+            try
+            {
+                related = await suggester.GetRelatedTagsAsync(word, ct).ConfigureAwait(true);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                // 相关标签查询失败不影响联想列表。
+            }
+
+            if (ct.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (suggestions.Count == 0 && related.Count == 0)
+            {
+                TagSuggestPopup.IsOpen = false;
+                return;
+            }
+
+            BuildSuggestList(suggestions, related, word);
+            PositionTagSuggestPopup();
+            TagSuggestPopup.IsOpen = true;
+        }
+        catch (OperationCanceledException)
+        {
+            // 防抖取消：忽略
+        }
+        catch (Exception)
+        {
+            TagSuggestPopup.IsOpen = false;
+        }
+    }
+
+    private void BuildSuggestList(IReadOnlyList<TagSuggestion> suggestions, IReadOnlyList<TagSuggestion> related, string word)
+    {
+        SuggestList.Items.Clear();
+        RelatedList.Items.Clear();
+        var existing = CurrentTagWords(TagBox.Text);
+
+        SuggestHeaderText.Text = suggestions.Count > 0
+            ? "标签联想（勾选加入搜索）"
+            : "没有匹配的联想标签";
+        foreach (var suggestion in suggestions)
+        {
+            SuggestList.Items.Add(BuildSuggestionCheckBox(suggestion, existing, word));
+        }
+
+        RelatedHeaderText.Visibility = related.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var suggestion in related)
+        {
+            RelatedList.Items.Add(BuildSuggestionCheckBox(suggestion, existing, word));
+        }
+    }
+
+    private CheckBox BuildSuggestionCheckBox(TagSuggestion suggestion, HashSet<string> existing, string word)
+    {
+        var checkBox = new CheckBox
+        {
+            IsChecked = existing.Contains(suggestion.Name),
+            MinHeight = 32,
+            Padding = new Thickness(6, 2, 6, 2),
+        };
+
+        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        if (suggestion.Category is { } category)
+        {
+            panel.Children.Add(new Microsoft.UI.Xaml.Shapes.Ellipse
+            {
+                Width = 7,
+                Height = 7,
+                VerticalAlignment = VerticalAlignment.Center,
+                Fill = new SolidColorBrush(CategoryColor(category)),
+            });
+        }
+
+        var primary = suggestion.ChineseName ?? suggestion.Name;
+        panel.Children.Add(new TextBlock
+        {
+            Text = primary,
+            VerticalAlignment = VerticalAlignment.Center,
+            MaxWidth = 220,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        });
+        if (suggestion.ChineseName is not null)
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = suggestion.Name,
+                Foreground = (Brush)Application.Current.Resources["AppTextSecondaryBrush"],
+                FontSize = 11.5,
+                VerticalAlignment = VerticalAlignment.Center,
+                MaxWidth = 150,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+            });
+        }
+
+        if (suggestion.PostCount is { } count)
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = FormatTagCount(count),
+                Foreground = (Brush)Application.Current.Resources["AppTextTertiaryBrush"],
+                FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center,
+            });
+        }
+
+        checkBox.Content = panel;
+        var tooltipLines = new List<string> { suggestion.Name };
+        if (suggestion.ChineseName is not null)
+        {
+            tooltipLines.Insert(0, $"中文：{suggestion.ChineseName}");
+        }
+
+        if (suggestion.Category is { } cat)
+        {
+            tooltipLines.Add($"类别：{CategoryDisplayName(cat)}");
+        }
+
+        if (suggestion.PostCount is { } posts)
+        {
+            tooltipLines.Add($"帖子数：{posts}");
+        }
+
+        ToolTipService.SetToolTip(checkBox, string.Join('\n', tooltipLines));
+        var tagName = suggestion.Name;
+        checkBox.Checked += (_, _) => ToggleTagWord(tagName, add: true);
+        checkBox.Unchecked += (_, _) => ToggleTagWord(tagName, add: false);
+        return checkBox;
+    }
+
+    /// <summary>把勾选的标签加入输入框（替换未完成的最后一个词），取消勾选则移除。</summary>
+    private void ToggleTagWord(string tag, bool add)
+    {
+        var text = TagBox.Text;
+        var trimmed = text.TrimEnd();
+        var endsWithSpace = text.Length > 0 && text.EndsWith(' ');
+        var words = new List<string>(
+            trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        if (!endsWithSpace && words.Count > 0)
+        {
+            // 末尾是尚未应用的输入片段：不计入已完成标签，将被勾选的标签替换
+            words.RemoveAt(words.Count - 1);
+        }
+
+        if (add)
+        {
+            if (!words.Contains(tag, StringComparer.OrdinalIgnoreCase))
+            {
+                words.Add(tag);
+            }
+
+            SetTagBoxText(words.Count > 0 ? string.Join(' ', words) + " " : string.Empty);
+        }
+        else
+        {
+            SetTagBoxText(string.Join(
+                ' ',
+                words.Where(w => !w.Equals(tag, StringComparison.OrdinalIgnoreCase))));
+        }
+    }
+
+    private void SetTagBoxText(string text)
+    {
+        _suppressSuggestEvents = true;
+        try
+        {
+            TagBox.Text = text;
+            TagBox.SelectionStart = TagBox.Text.Length;
+        }
+        finally
+        {
+            _suppressSuggestEvents = false;
+        }
+    }
+
+    private static HashSet<string> CurrentTagWords(string text) => new(
+        text.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+        StringComparer.OrdinalIgnoreCase);
+
+    private static string LastWord(string text)
+    {
+        var trimmed = text.TrimEnd();
+        var idx = trimmed.LastIndexOf(' ');
+        return idx >= 0 ? trimmed[(idx + 1)..] : trimmed;
+    }
+
+    private void PositionTagSuggestPopup()
+    {
+        try
+        {
+            var origin = TagSearchHost.TransformToVisual(this)
+                .TransformPoint(new Windows.Foundation.Point(0, TagSearchHost.ActualHeight + 6));
+            TagSuggestPopup.HorizontalOffset = origin.X;
+            TagSuggestPopup.VerticalOffset = origin.Y;
+        }
+        catch (Exception)
+        {
+            // 布局未就绪时保持默认位置。
+        }
+    }
+
+    private static Windows.UI.Color CategoryColor(TagCategory category) => category switch
+    {
+        TagCategory.Artist => Windows.UI.Color.FromArgb(255, 0xE8, 0xA2, 0x3D),
+        TagCategory.Character => Windows.UI.Color.FromArgb(255, 0x35, 0xC0, 0x75),
+        TagCategory.Copyright => Windows.UI.Color.FromArgb(255, 0x9B, 0x59, 0xD0),
+        TagCategory.Meta => Windows.UI.Color.FromArgb(255, 0xE5, 0x48, 0x4D),
+        TagCategory.Circle => Windows.UI.Color.FromArgb(255, 0x4C, 0xA6, 0xC9),
+        _ => Windows.UI.Color.FromArgb(255, 0x80, 0x80, 0x80),
+    };
+
+    private static string CategoryDisplayName(TagCategory category) => category switch
+    {
+        TagCategory.Artist => "画师",
+        TagCategory.Character => "角色",
+        TagCategory.Copyright => "作品",
+        TagCategory.Meta => "元数据",
+        TagCategory.Circle => "社团",
+        _ => "通用",
+    };
+
+    private static string FormatTagCount(long count) => count switch
+    {
+        >= 1_000_000 => $"{count / 1_000_000.0:0.#}M",
+        >= 1_000 => $"{count / 1_000.0:0.#}k",
+        _ => count.ToString(System.Globalization.CultureInfo.InvariantCulture),
+    };
+
     /// <summary>应用标签到当前图源并保存、刷新；空串表示清除标签。</summary>
     private void ApplyTags(string tags)
     {
@@ -181,6 +461,7 @@ public sealed partial class GalleryPage : Page, IModePage
             return;
         }
 
+        TagSuggestPopup.IsOpen = false;
         tags = tags.Trim();
         _currentSource.Tags = tags;
         _settings.SourceTags[_currentSource.Id] = tags;

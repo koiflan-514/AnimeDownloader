@@ -1,13 +1,15 @@
 using System.Text.Json.Nodes;
 using AnimeDownloader.Core.Models;
+using AnimeDownloader.Core.Services;
 
 namespace AnimeDownloader.Core.Sources;
 
 /// <summary>
 /// Shared adapter for Moebooru-family sites (yande.re, konachan, ...) which expose the same
 /// <c>/post.json</c> API with tag/rating filters, paging and preview thumbnails.
+/// 支持标签联想（/tag.json）与相关标签（/tag/related.json）。
 /// </summary>
-public abstract class MoebooruSourceBase : ImageSourceBase
+public abstract class MoebooruSourceBase : ImageSourceBase, ITagSuggester
 {
     private const int RandomRetries = 3;
     private const int RandomMaxPage = 10000;
@@ -15,6 +17,7 @@ public abstract class MoebooruSourceBase : ImageSourceBase
     private const int RandomFallbackPage = 1;
     private const int RandomBatchSize = 100;
     private readonly string _endpoint;
+    private readonly string _siteBase;
     private readonly string _displayName;
     private readonly string _description;
 
@@ -27,6 +30,9 @@ public abstract class MoebooruSourceBase : ImageSourceBase
         : base(http, sourceId)
     {
         _endpoint = endpoint;
+        _siteBase = endpoint.EndsWith("/post.json", StringComparison.Ordinal)
+            ? endpoint[..^"/post.json".Length]
+            : endpoint;
         _displayName = displayName;
         _description = description;
     }
@@ -225,7 +231,29 @@ public abstract class MoebooruSourceBase : ImageSourceBase
                 : string.IsNullOrWhiteSpace(source) ? BuildPostLink(id) : source,
             Id: id,
             Extension: extension,
-            Metadata: BuildMetadata(root, width, height));
+            Metadata: BuildMetadata(root, width, height),
+            Tags: ReadTags(post));
+    }
+
+    /// <summary>读取帖子全部标签（tags 为空格分隔字符串；类别需联想接口按需查询）。</summary>
+    private static IReadOnlyList<ImageTag> ReadTags(JsonNode? post)
+    {
+        var tagString = post?["tags"]?.GetValue<string>();
+        if (string.IsNullOrWhiteSpace(tagString))
+        {
+            return Array.Empty<ImageTag>();
+        }
+
+        var tags = new List<ImageTag>();
+        foreach (var name in tagString.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (name.Length > 0)
+            {
+                tags.Add(new ImageTag(name));
+            }
+        }
+
+        return tags;
     }
 
     private static string? InferExtension(string url)
@@ -240,4 +268,120 @@ public abstract class MoebooruSourceBase : ImageSourceBase
         var ext = path[(dot + 1)..];
         return ext.Length is > 0 and <= 8 ? ext : null;
     }
+
+    // ---------------- 标签联想与相关标签（ITagSuggester） ----------------
+
+    /// <inheritdoc />
+    public bool SupportsTagSuggestions => true;
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<TagSuggestion>> SuggestTagsAsync(
+        string input,
+        int limit = 15,
+        CancellationToken cancellationToken = default)
+    {
+        var prefix = input.Trim();
+        if (prefix.Length == 0 || limit <= 0)
+        {
+            return Array.Empty<TagSuggestion>();
+        }
+
+        var data = await GetJsonAsync($"{_siteBase}/tag.json", new Dictionary<string, string?>
+        {
+            ["name"] = $"{prefix}*",
+            ["order"] = "count",
+            ["limit"] = Math.Clamp(limit, 1, 30).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        }, cancellationToken).ConfigureAwait(false);
+        var nodes = data?.AsArray();
+        if (nodes is null)
+        {
+            return Array.Empty<TagSuggestion>();
+        }
+
+        var suggestions = new List<TagSuggestion>(nodes.Count);
+        foreach (var node in nodes)
+        {
+            var name = node?["name"]?.GetValue<string>();
+            if (string.IsNullOrEmpty(name))
+            {
+                continue;
+            }
+
+            var count = node?["count"]?.GetValue<long>();
+            var category = ParseCategory(node?["type"]?.GetValue<int>());
+            TagLocalization.TryGet(name, out var localized);
+            suggestions.Add(new TagSuggestion(name, count, category, localized.ChineseName));
+        }
+
+        return suggestions;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<TagSuggestion>> GetRelatedTagsAsync(
+        string tag,
+        CancellationToken cancellationToken = default)
+    {
+        var name = tag.Trim();
+        if (name.Length == 0)
+        {
+            return Array.Empty<TagSuggestion>();
+        }
+
+        var data = await GetJsonAsync($"{_siteBase}/tag/related.json", new Dictionary<string, string?>
+        {
+            ["tags"] = name,
+        }, cancellationToken).ConfigureAwait(false);
+        var groups = data?["tags"]?.AsObject();
+        if (groups is null)
+        {
+            return Array.Empty<TagSuggestion>();
+        }
+
+        var suggestions = new List<TagSuggestion>();
+        foreach (var group in groups)
+        {
+            if (group.Value?.AsArray() is not { } entries)
+            {
+                continue;
+            }
+
+            foreach (var entry in entries)
+            {
+                // 条目形如 ["vocaloid", 123456, 3]
+                if (entry is not JsonArray array || array.Count < 3)
+                {
+                    continue;
+                }
+
+                var relatedName = array[0]?.GetValue<string>();
+                if (string.IsNullOrEmpty(relatedName) ||
+                    relatedName.Equals(name, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var count = array[1]?.GetValue<long>();
+                var category = ParseCategory(array[2]?.GetValue<int>());
+                TagLocalization.TryGet(relatedName, out var localized);
+                suggestions.Add(new TagSuggestion(relatedName, count, category, localized.ChineseName));
+                if (suggestions.Count >= 12)
+                {
+                    return suggestions;
+                }
+            }
+        }
+
+        return suggestions;
+    }
+
+    private static TagCategory? ParseCategory(int? value) => value switch
+    {
+        0 => TagCategory.General,
+        1 => TagCategory.Artist,
+        2 => TagCategory.Circle,
+        3 => TagCategory.Copyright,
+        4 => TagCategory.Character,
+        5 => TagCategory.Meta,
+        _ => null,
+    };
 }

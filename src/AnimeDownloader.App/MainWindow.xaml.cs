@@ -273,6 +273,27 @@ public sealed partial class MainWindow : Window
         NavigateTo("settings");
     }
 
+    /// <summary>
+    /// 跳转到"标签视图"：把当前图源的标签设为指定标签并回到画廊刷新。
+    /// 由查看器的标签 chip 点击触发（点击图片上的任一标签即可浏览该标签下的图片）。
+    /// </summary>
+    public void NavigateToTagView(string tag)
+    {
+        var cleaned = tag.Trim();
+        if (cleaned.Length == 0 || !_currentSource.SupportsTags)
+        {
+            return;
+        }
+
+        _currentSource.Tags = cleaned;
+        _settings.SourceTags[_currentSource.Id] = cleaned;
+        _settingsStore.Save(_settings);
+        RootNav.SelectedItem = GalleryNavItem;
+        NavigateTo("gallery");
+        (_currentPage as IModePage)?.OnSourceChanged();
+        SetGlobalStatus($"已切换到标签视图：{cleaned}");
+    }
+
     private void OnSourceSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_syncingToolbar)
