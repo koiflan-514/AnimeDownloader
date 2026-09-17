@@ -297,10 +297,10 @@ public sealed partial class GalleryViewerWindow : Window
                 OnToggleFullscreen(sender, new RoutedEventArgs());
                 break;
             case VirtualKey.Escape:
-                if (AppWindow.Presenter is Microsoft.UI.Windowing.FullScreenPresenter)
+                if (IsFullscreen())
                 {
                     e.Handled = true;
-                    ExitFullscreen();
+                    OnToggleFullscreen(sender, new RoutedEventArgs());
                 }
 
                 break;
@@ -309,27 +309,16 @@ public sealed partial class GalleryViewerWindow : Window
 
     private void OnToggleFullscreen(object sender, RoutedEventArgs e)
     {
-        if (AppWindow.Presenter is Microsoft.UI.Windowing.FullScreenPresenter)
-        {
-            ExitFullscreen();
-        }
-        else
-        {
-            AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen);
-            Toolbar.Visibility = Visibility.Collapsed;
-            TagsHost.Visibility = Visibility.Collapsed;
-        }
+        // 走公共实现：它会在退出全屏时还原窗口几何 / 最大化状态。
+        // 直接 SetPresenter(Overlapped) 虽然能出全屏，但被最大化过的窗口回不来。
+        Win11Chrome.SetFullscreen(this, Root, !IsFullscreen());
+        var fullscreen = IsFullscreen();
+        Toolbar.Visibility = fullscreen ? Visibility.Collapsed : Visibility.Visible;
+        TagsHost.Visibility = fullscreen || !_hasTags ? Visibility.Collapsed : Visibility.Visible;
     }
 
-    private void ExitFullscreen()
-    {
-        AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Overlapped);
-        Toolbar.Visibility = Visibility.Visible;
-        if (_hasTags)
-        {
-            TagsHost.Visibility = Visibility.Visible;
-        }
-    }
+    private bool IsFullscreen() =>
+        AppWindow.Presenter is Microsoft.UI.Windowing.FullScreenPresenter;
 
     private async void OnSave(object sender, RoutedEventArgs e)
     {

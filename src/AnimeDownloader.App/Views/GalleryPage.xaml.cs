@@ -18,9 +18,18 @@ namespace AnimeDownloader.App.Views;
 public sealed partial class GalleryPage : Page, IModePage
 {
 #pragma warning restore CA1001
-    private const double ItemSpacing = 8;
-    private const double MinItemSize = 120;
-    private const double MaxItemSize = 220;
+    // 接触印相节奏：更少的列、更大的相纸、更紧的栏距。
+    // 目标是让每一格读起来像一张照片，而不是一个「缩略图」。
+    //
+    // 关于间隙（CardGutter）：它必须是**瓦片之内**的差额，而不是宽度算式里的预留项。
+    // 旧写法把列宽算成 (width - 10*(n-1))/n 却让卡片铺满瓦片，于是间隙从来没出现过 ——
+    // 卡片彼此贴死，而算式预留出来的那 10*(n-1) 变成右侧空掉的一条。
+    // 现在的规则：瓦片 = 行宽 ÷ 列数（精确铺满，ItemsWrapGrid 不会多出一格去换行），
+    // 卡片 = 瓦片 - CardGutter（居中），相邻两张之间自然是 CardGutter，
+    // 最外两侧各让出 CardGutter/2 —— 左右对称，不是缺陷。
+    private const double CardGutter = 10;
+    private const double IdealCardSize = 238;
+    private const int MaxColumns = 8;
 
     private MainWindow? _owner;
     private IReadOnlyList<IImageSource> _sources = Array.Empty<IImageSource>();
@@ -416,12 +425,18 @@ public sealed partial class GalleryPage : Page, IModePage
         return idx >= 0 ? trimmed[(idx + 1)..] : trimmed;
     }
 
+    /// <summary>把联想弹层贴到标签输入框的下沿（左对齐）。</summary>
     private void PositionTagSuggestPopup()
     {
         try
         {
+            // Popup 的 HorizontalOffset / VerticalOffset 是「父容器内容原点 + 自身布局槽位」的
+            // 相对量，不是窗口坐标。TagSuggestPopup 挂在根 Grid 且是第一个子元素 —— 它的槽位
+            // 原点与页面原点重合，所以这里算出的页面坐标可以当作偏移量直接使用。
+            //
+            // 纵向下移量取 ActualHeight（而非 ActualHeight + 6）：面板顶边要与输入框底边重合。
             var origin = TagSearchHost.TransformToVisual(this)
-                .TransformPoint(new Windows.Foundation.Point(0, TagSearchHost.ActualHeight + 6));
+                .TransformPoint(new Windows.Foundation.Point(0, TagSearchHost.ActualHeight));
             TagSuggestPopup.HorizontalOffset = origin.X;
             TagSuggestPopup.VerticalOffset = origin.Y;
         }
@@ -722,7 +737,7 @@ public sealed partial class GalleryPage : Page, IModePage
         UpdateGridLayout();
     }
 
-    /// <summary>按窗口宽度重算方形卡片尺寸（2-8 列）。</summary>
+    /// <summary>按窗口宽度重算方形相纸尺寸（2-8 列）。</summary>
     private void UpdateGridLayout()
     {
         if (ThumbGrid.ItemsPanelRoot is not ItemsWrapGrid panel)
@@ -736,13 +751,20 @@ public sealed partial class GalleryPage : Page, IModePage
             return;
         }
 
-        var columns = Math.Clamp((int)Math.Round(width / 200), 2, 8);
-        var itemSize = Math.Clamp(
-            (width - ItemSpacing * (columns - 1)) / columns,
-            MinItemSize,
-            MaxItemSize);
-        panel.ItemWidth = itemSize;
-        panel.ItemHeight = itemSize;
+        // 瓦片精确铺满整行：n 个瓦片不超过可用宽度，ItemsWrapGrid 才不会把最后一张挤到下一行。
+        var columns = Math.Clamp(
+            (int)Math.Round(width / (IdealCardSize + CardGutter)),
+            2,
+            MaxColumns);
+        // 向下取整（再留半像素余量），这一步不能省。面板实际拿到的是 ScrollViewer 的视口宽度，
+        // 它比 GridView.ActualWidth 略小一点点；瓦片若取除法原值，
+        // n 个瓦片就会刚好等于 ActualWidth 而超出视口 —— 症状是最右一列整列消失
+        // （每行都只排满 n-1 张，右侧空出一条瓦片宽的空地），很容易误判成「列数算错」。
+        var tile = Math.Floor((width - 0.5) / columns);
+        var itemSize = tile - CardGutter;
+
+        panel.ItemWidth = tile;
+        panel.ItemHeight = tile;
         _itemSize = itemSize;
         // 卡片显式定宽高：避免 GridViewItem 按图片自然尺寸测量导致首卡容器异常变高
         foreach (var item in ThumbGrid.Items)

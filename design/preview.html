@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AnimeDownloader · 暗房 Darkroom — 界面改版预览</title>
+<style>
+/* ==========================================================================
+   暗房 Darkroom — 令牌层
+   与 App.xaml / AppStyles.xaml 中的令牌一一对应，数值完全一致。
+   本文件是该设计语言的 1:1 可交互样张（含真实悬停态与亮暗切换）。
+   ========================================================================== */
+:root{
+  --font-display:"Segoe UI Variable Display","Segoe UI Variable Text","Segoe UI",Inter,system-ui,"Microsoft YaHei UI",sans-serif;
+  --font-text:"Segoe UI Variable Text","Segoe UI",Inter,system-ui,"Microsoft YaHei UI",sans-serif;
+  --font-mono:"Cascadia Mono",Consolas,ui-monospace,"Microsoft YaHei UI",monospace;
+
+  --r-control:7px; --r-card:12px; --r-panel:14px; --r-pill:999px;
+}
+html[data-theme="dark"]{
+  --canvas:#0D0E11; --rail:#0A0B0D; --surface:#14161A; --surface-hover:#1B1E24;
+  --sunken:#07080A; --track:#0D0E11;
+  --hairline:rgba(255,255,255,.08); --hairline-strong:rgba(255,255,255,.15);
+  --hover:rgba(255,255,255,.06); --pressed:rgba(255,255,255,.10);
+  --t1:#EDEEF1; --t2:#9AA0AB; --t3:#6B7179; --t4:#474C55;
+  /* 安全灯 = 用户的 Windows 强调色。这里是默认值（Windows 默认蓝），
+     实际运行时会由 WindowsColorScheme 服务从 UISettings 读取并覆写；
+     本页顶部的色板即模拟这一行为。 */
+  --accent:#0078D4; --accent-strong:#4CA0E0; --accent-soft:rgba(0,120,212,.16);
+  --accent-line:rgba(0,120,212,.42); --accent-ink:#FFFFFF; --focus:#0078D4;
+  --idle:#585E67; --error:#E0575E;
+  --viewer:#06070A; --glass:rgba(20,22,26,.95);
+  --scrim:linear-gradient(to bottom,rgba(11,12,15,0) 0%,rgba(11,12,15,.9) 100%);
+  --shadow:none;
+}
+html[data-theme="light"]{
+  --canvas:#F7F7F9; --rail:#F1F1F4; --surface:#FFFFFF; --surface-hover:#FBFBFD;
+  --sunken:#EBEBEF; --track:#F0F0F3;
+  --hairline:rgba(0,0,0,.07); --hairline-strong:rgba(0,0,0,.13);
+  --hover:rgba(0,0,0,.04); --pressed:rgba(0,0,0,.08);
+  --t1:#15161A; --t2:#5A606A; --t3:#878D96; --t4:#B3B7BE;
+  /* 亮色模式整体下沉一档（Dark1）—— 与 WinUI 的 AccentFillColor 处理一致 */
+  --accent:#005A9E; --accent-strong:#004578; --accent-soft:rgba(0,90,158,.12);
+  --accent-line:rgba(0,90,158,.45); --accent-ink:#FFFFFF; --focus:#005A9E;
+  --idle:#9AA0A8; --error:#C0392F;
+  --viewer:#16171B; --glass:rgba(255,255,255,.95);
+  --scrim:linear-gradient(to bottom,rgba(0,0,0,0) 0%,rgba(0,0,0,.45) 100%);
+  --shadow:none;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:#08090B; color:var(--t1);
+  font-family:var(--font-text); font-size:13px;
+  -webkit-font-smoothing:antialiased;
+}
+html[data-theme="light"] body{background:#E7E7EA}
+
+/* ---------- 预览页外壳（不属于应用本身） ---------- */
+.pv-bar{
+  position:sticky; top:0; z-index:50;
+  display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  padding:13px 22px;
+  background:#0B0C0F; border-bottom:1px solid rgba(255,255,255,.08);
+}
+html[data-theme="light"] .pv-bar{background:#FBFBFC;border-bottom-color:rgba(0,0,0,.08)}
+.pv-brand{display:flex;align-items:baseline;gap:10px}
+.pv-brand b{font-family:var(--font-display);font-size:14px;font-weight:600;letter-spacing:-.2px;color:var(--t1)}
+.pv-brand span{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.9px;color:var(--t3)}
+.pv-tabs{display:flex;gap:2px;background:var(--sunken);border:1px solid var(--hairline);border-radius:8px;padding:3px}
+.pv-tabs button{
+  font-family:var(--font-text);font-size:12px;color:var(--t2);
+  background:transparent;border:1px solid transparent;border-radius:5px;
+  padding:5px 13px;cursor:pointer;transition:background .15s,color .15s;
+}
+.pv-tabs button:hover{background:var(--hover);color:var(--t1)}
+.pv-tabs button.on{background:var(--accent-soft);border-color:var(--accent-line);color:var(--t1);font-weight:600}
+.pv-note{margin-left:auto;font-family:var(--font-mono);font-size:10.5px;letter-spacing:.4px;color:var(--t3);max-width:520px;line-height:1.5}
+.pv-toggle{
+  display:flex;align-items:center;gap:7px;font-size:12px;color:var(--t2);
+  background:transparent;border:1px solid var(--hairline-strong);border-radius:7px;
+  padding:5px 11px;cursor:pointer;transition:background .15s,border-color .15s,color .15s;
+}
+.pv-toggle:hover{background:var(--hover);color:var(--t1);border-color:var(--accent-line)}
+
+/* 强调色色板 —— 模拟「用户的 Windows 个性化强调色」。
+   应用中该值来自 UISettings.ColorValuesChanged，不存在固定值。 */
+.pv-acc{display:flex;align-items:center;gap:9px}
+.pv-acc .lbl{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.9px;color:var(--t3)}
+.pv-acc .set{display:flex;gap:5px}
+.pv-acc i{
+  width:20px;height:20px;border-radius:5px;display:block;cursor:pointer;
+  border:1px solid var(--hairline-strong);transition:transform .12s,outline-color .12s;
+  outline:2px solid transparent; outline-offset:2px;
+}
+.pv-acc i:hover{transform:translateY(-1px)}
+.pv-acc i.on{outline-color:currentColor}
+
+main{padding:26px 22px 70px;display:flex;flex-direction:column;gap:30px;align-items:flex-start}
+.panel{display:none;width:100%}
+.panel.on{display:block}
+
+/* ---------- 窗口框（模拟 Win11 窗口，仅用于呈现） ---------- */
+.win{
+  width:100%; max-width:1240px; margin:0 auto;
+  border:1px solid rgba(255,255,255,.10); border-radius:10px; overflow:hidden;
+  background:var(--canvas);
+}
+html[data-theme="light"] .win{border-color:rgba(0,0,0,.12)}
+.win-cap{
+  display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;
+  background:var(--canvas); border-bottom:1px solid var(--hairline);
+}
+.win-dots{display:flex;gap:6px}
+.win-dots i{width:10px;height:10px;border-radius:50%;display:block;opacity:.55}
+.win-dots i:nth-child(1){background:#E0575E}
+.win-dots i:nth-child(2){background:var(--accent)}
+.win-dots i:nth-child(3){background:#5AA469}
+.win-title{flex:1;text-align:center;font-family:var(--font-mono);font-size:10.5px;letter-spacing:.5px;color:var(--t3);padding-right:44px}
+
+/* ==========================================================================
+   应用外壳：56px 导轨 + 命令条 + 内容
+   ========================================================================== */
+.app{display:flex;height:748px;overflow:hidden}
+
+/* ---- 导轨 ---- */
+.rail{
+  width:56px;flex:0 0 56px;background:var(--rail);
+  display:flex;flex-direction:column;align-items:center;
+  padding:6px 0 10px;
+}
+.rail-toggle{
+  width:36px;height:32px;display:flex;align-items:center;justify-content:center;
+  color:var(--t2);border-radius:7px;cursor:default;
+}
+.rail-toggle:hover{background:var(--hover);color:var(--t1)}
+.rail-nav{display:flex;flex-direction:column;gap:3px;margin-top:8px;width:100%;align-items:center}
+.rail-item{
+  position:relative;width:44px;height:40px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--t2);cursor:pointer;transition:background .15s,color .15s;
+}
+.rail-item:hover{background:var(--hover);color:var(--t1)}
+.rail-item.on{background:var(--accent-soft);color:var(--t1)}
+.rail-item.on::before{
+  content:"";position:absolute;left:-6px;top:11px;bottom:11px;width:2px;
+  background:var(--accent);border-radius:2px;
+}
+.rail-foot{margin-top:auto;opacity:.32;display:flex;align-items:center;justify-content:center}
+.ic{width:16px;height:16px;display:block;fill:currentColor}
+
+/* ---- 主区 ---- */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--canvas)}
+
+/* ---- 命令条 ---- */
+.cmd{
+  height:50px;flex:0 0 50px;display:flex;align-items:center;gap:12px;
+  padding:0 16px 0 20px;border-bottom:1px solid var(--hairline);
+}
+.lbl{font-size:11.5px;font-weight:600;letter-spacing:.2px;color:var(--t2)}
+.combo{
+  display:inline-flex;align-items:center;gap:9px;min-width:172px;
+  height:30px;padding:0 9px 0 11px;
+  background:var(--surface);border:1px solid var(--hairline-strong);border-radius:7px;
+  color:var(--t1);font-size:12.5px;cursor:pointer;transition:border-color .15s,background .15s;
+}
+.combo:hover{border-color:var(--accent-line);background:var(--surface-hover)}
+.combo span{flex:1;text-align:left}
+.combo svg{color:var(--t3)}
+.vdiv{width:1px;height:18px;background:var(--hairline-strong);flex:0 0 1px}
+.seg{display:inline-flex;background:var(--sunken);border:1px solid var(--hairline);border-radius:8px;padding:3px;height:32px}
+.seg button{
+  font-family:var(--font-text);font-size:12px;color:var(--t2);
+  background:transparent;border:1px solid transparent;border-radius:5px;
+  padding:0 13px;cursor:pointer;transition:background .15s,color .15s,border-color .15s;
+}
+.seg button:hover{background:var(--hover);color:var(--t1)}
+.seg button.on{background:var(--accent-soft);border-color:var(--accent-line);color:var(--t1);font-weight:600}
+.cmd-right{margin-left:auto;display:flex;align-items:center;gap:6px}
+.status{display:flex;align-items:center;gap:7px;padding:0 8px;max-width:230px}
+.dot{width:6px;height:6px;border-radius:50%;flex:0 0 6px}
+.dot.idle{background:var(--idle)} .dot.busy{background:var(--accent)} .dot.err{background:var(--error)}
+.mono-sm{font-family:var(--font-mono);font-size:11.5px;letter-spacing:.1px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---- 按钮 ---- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  height:32px;padding:0 13px;border-radius:var(--r-control);
+  font-family:var(--font-text);font-size:12.5px;color:var(--t1);
+  background:transparent;border:1px solid var(--hairline-strong);cursor:pointer;
+  transition:background .15s,border-color .15s,color .15s,opacity .1s;
+}
+.btn:hover{background:var(--surface-hover)}
+.btn:active{background:var(--accent-soft);border-color:var(--accent-line);opacity:.86}
+.btn-icon{width:32px;height:32px;padding:0;border-color:transparent;color:var(--t2)}
+.btn-icon:hover{background:var(--hover);color:var(--t1)}
+.btn-icon:active{background:var(--accent-soft);color:var(--accent)}
+.btn-primary{
+  position:relative;height:34px;padding:0 16px;font-weight:600;
+  background:var(--accent);color:var(--accent-ink);border:none;
+}
+.btn-primary::after{
+  content:"";position:absolute;left:1px;right:1px;top:0;height:1px;
+  background:rgba(255,255,255,.35);border-radius:1px;
+}
+.btn-primary:hover{background:var(--accent-strong)}
+.btn-primary:active{opacity:.86}
+.btn-primary::after{transition:opacity .1s}
+.btn-primary:active::after{opacity:0}
+
+/* ==========================================================================
+   画廊 = 接触印相
+   ========================================================================== */
+.body{flex:1;min-height:0;display:flex;flex-direction:column}
+.g-head{padding:22px 28px 0}
+.eyebrow{font-family:var(--font-mono);font-size:10.5px;font-weight:600;letter-spacing:.95px;color:var(--t3)}
+.display{font-family:var(--font-display);font-size:32px;font-weight:600;letter-spacing:-.8px;color:var(--t1);margin:5px 0 0;line-height:1.15}
+.hint{font-size:12.5px;color:var(--t2);margin:5px 0 0}
+.rule{height:1px;background:var(--hairline);margin:18px 0 0}
+.filters{display:flex;align-items:center;gap:10px;margin:14px 0 16px;flex-wrap:nowrap;overflow:hidden}
+.tagbox{
+  display:flex;align-items:center;gap:2px;height:30px;
+  background:var(--sunken);border:1px solid var(--hairline);border-radius:var(--r-control);padding:2px;
+}
+.tagbox .ph{padding:0 11px;font-size:12.5px;color:var(--t3);width:236px}
+.tagbox .mini{width:26px;height:26px;display:flex;align-items:center;justify-content:center;color:var(--t3);border-radius:5px;cursor:pointer}
+.tagbox .mini:hover{background:var(--hover);color:var(--t1)}
+.chip{
+  display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 9px;
+  background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:var(--r-pill);
+  font-family:var(--font-mono);font-size:11px;color:var(--t1);
+}
+.chip .x{color:var(--t3);cursor:pointer;font-size:10px}
+.chip .x:hover{color:var(--accent)}
+.tgl{
+  height:32px;padding:0 12px;border-radius:var(--r-control);font-size:12px;color:var(--t2);
+  background:transparent;border:1px solid var(--hairline-strong);cursor:pointer;
+  transition:background .15s,border-color .15s,color .15s;
+}
+.tgl:hover{background:var(--hover);color:var(--t1)}
+.tgl.on{background:var(--accent-soft);border-color:var(--accent-line);color:var(--t1);font-weight:600}
+
+/* 相纸网格 */
+.sheet{
+  flex:1;min-height:0;overflow:auto;padding:0 28px 20px;
+  display:grid;grid-template-columns:repeat(6,1fr);gap:10px;align-content:start;
+}
+.plate{
+  position:relative;aspect-ratio:1/1;border-radius:var(--r-card);overflow:hidden;
+  background:var(--surface);border:1px solid var(--hairline);
+  transition:border-color .18s,background .18s;
+}
+.plate img{width:100%;height:100%;object-fit:cover;display:block}
+.plate::after{
+  content:"";position:absolute;inset:0;border-radius:11px;
+  border:1px solid transparent;transition:border-color .18s;pointer-events:none;
+}
+.plate:hover::after{border-color:var(--accent-line)}
+.plate .scrim{
+  position:absolute;left:0;right:0;bottom:0;height:52px;background:var(--scrim);
+  display:flex;align-items:flex-end;padding:0 11px 9px;
+  font-family:var(--font-mono);font-size:10.5px;letter-spacing:.6px;color:#F0F1F3;
+  white-space:nowrap;overflow:hidden;
+}
+.plate .res{
+  position:absolute;top:9px;right:9px;padding:2px 6px;border-radius:5px;
+  background:rgba(7,8,9,.6);font-family:var(--font-mono);font-size:10px;letter-spacing:.2px;color:#E6E8EB;
+}
+.plate .acts{
+  position:absolute;right:9px;bottom:9px;display:flex;gap:5px;
+  opacity:0;transition:opacity .18s;
+}
+.plate:hover .acts{opacity:1}
+.ov-btn{
+  width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  background:rgba(11,12,15,.7);color:#F2F3F5;border:none;cursor:pointer;
+  transition:background .15s,color .15s;
+}
+.ov-btn:hover{background:var(--accent);color:var(--accent-ink)}
+
+/* ---- 页脚轨道 ---- */
+.foot{
+  height:48px;flex:0 0 48px;display:flex;align-items:center;gap:12px;
+  padding:0 16px 0 20px;border-top:1px solid var(--hairline);
+}
+.foot-left{display:flex;align-items:center;gap:9px;min-width:0}
+.foot-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.pbar{width:132px;height:3px;border-radius:2px;background:var(--hairline-strong);overflow:hidden}
+.pbar i{display:block;height:100%;width:58%;background:var(--accent)}
+.mono-strong{font-family:var(--font-mono);font-size:12px;font-weight:600;letter-spacing:.2px;color:var(--t1)}
+.spin{width:15px;height:15px;flex:0 0 15px}
+.spin circle{fill:none;stroke:var(--accent);stroke-width:3;stroke-linecap:round;stroke-dasharray:26 60;animation:sp 1.1s linear infinite;transform-origin:50% 50%}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ==========================================================================
+   灯箱
+   ========================================================================== */
+.v-head{padding:20px 28px 0;display:flex;align-items:flex-end;gap:16px}
+.v-meta{font-size:12.5px;color:var(--t2);margin:5px 0 0;font-family:var(--font-text)}
+.v-links{margin-left:auto;display:flex;align-items:center;gap:4px}
+.lnk{
+  font-size:12.5px;color:var(--t1);background:transparent;border:none;padding:6px 9px;
+  border-radius:6px;cursor:pointer;transition:background .15s,color .15s;
+}
+.lnk:hover{background:var(--hover);color:var(--accent)}
+.tagstrip{
+  margin:18px 0 0;padding:9px 24px;border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline);
+}
+.tagstrip .lbl{display:block;margin-bottom:7px}
+.taglist{display:flex;gap:6px;flex-wrap:wrap}
+.tagc{
+  font-family:var(--font-mono);font-size:11px;color:var(--t2);
+  border:1px solid var(--hairline-strong);border-radius:var(--r-pill);padding:3px 9px;cursor:pointer;
+  transition:background .15s,color .15s,border-color .15s;
+}
+.tagc:hover{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent)}
+
+.table{
+  flex:1;min-height:0;margin:16px 20px 14px;border-radius:var(--r-panel);
+  background:var(--viewer);border:1px solid var(--hairline);
+  position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;
+}
+.table img{max-width:72%;max-height:82%;object-fit:contain;border-radius:2px}
+.ichips{position:absolute;left:14px;bottom:14px;display:flex;gap:6px}
+.ichip{
+  padding:3px 8px;border-radius:5px;background:rgba(7,8,9,.7);
+  font-family:var(--font-mono);font-size:10.5px;letter-spacing:.4px;color:#EDEFF2;
+}
+.toolbar{
+  position:absolute;left:50%;bottom:14px;transform:translateX(-50%);
+  display:flex;align-items:center;gap:1px;padding:6px 7px;
+  background:var(--glass);border:1px solid var(--hairline-strong);border-radius:var(--r-pill);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+}
+.toolbar .btn-icon{color:#E8EAED}
+html[data-theme="light"] .toolbar .btn-icon{color:var(--t1)}
+.toolbar .sep{width:1px;height:18px;background:var(--hairline-strong);margin:0 7px}
+.zoom{
+  font-family:var(--font-mono);font-size:12px;font-weight:600;color:#EDEFF2;
+  min-width:50px;text-align:center;
+}
+html[data-theme="light"] .zoom{color:var(--t1)}
+
+/* ==========================================================================
+   设置 = 参数表
+   ========================================================================== */
+.s-wrap{flex:1;min-height:0;overflow:auto;padding:22px 28px 44px}
+.s-grid{max-width:900px;display:grid;grid-template-columns:146px 1fr;column-gap:36px;row-gap:26px}
+.s-group{font-family:var(--font-mono);font-size:11px;font-weight:600;letter-spacing:.85px;color:var(--t3);padding-top:15px}
+.row{
+  display:flex;align-items:center;gap:20px;padding:13px 0;
+  border-bottom:1px solid var(--hairline);
+}
+.row:last-child{border-bottom:none}
+.row .txt{flex:1;min-width:0}
+.row .t{font-size:13px;color:var(--t1)}
+.row .d{font-size:11.5px;color:var(--t3);margin-top:3px}
+.num{
+  width:124px;height:32px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 8px 0 11px;background:var(--surface);border:1px solid var(--hairline-strong);
+  border-radius:var(--r-control);font-family:var(--font-mono);font-size:12.5px;color:var(--t1);
+}
+.num .sp{display:flex;flex-direction:column;gap:2px;color:var(--t3);font-size:8px;line-height:1}
+.sw{
+  width:40px;height:20px;border-radius:var(--r-pill);background:var(--accent);
+  position:relative;flex:0 0 40px;cursor:pointer;border:1px solid var(--accent);
+}
+.sw i{position:absolute;right:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--accent-ink);display:block}
+.sw.off{background:var(--sunken);border-color:var(--hairline-strong)}
+.sw.off i{right:auto;left:2px;background:var(--t3)}
+.cb{width:18px;height:18px;border-radius:4px;border:1px solid var(--hairline-strong);flex:0 0 18px;background:transparent}
+.cb.on{background:var(--accent);border-color:var(--accent);position:relative}
+.cb.on::after{content:"✓";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--accent-ink)}
+.s-actions{
+  max-width:900px;margin-top:26px;padding-top:16px;
+  border-top:1px solid var(--hairline-strong);display:flex;align-items:center;gap:10px;
+}
+
+/* ==========================================================================
+   令牌面板
+   ========================================================================== */
+.tok{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:22px}
+.card{
+  background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-panel);
+  padding:18px 20px;
+}
+.card h3{margin:0 0 14px;font-family:var(--font-mono);font-size:11px;font-weight:600;letter-spacing:.85px;color:var(--t3)}
+.sw-row{display:flex;align-items:center;gap:11px;margin-bottom:9px}
+.sw-box{width:34px;height:22px;border-radius:5px;border:1px solid var(--hairline);flex:0 0 34px}
+/* 名称可省略，数值不换行右对齐 —— 令牌名比读数长，让前者先收缩 */
+.sw-name{font-family:var(--font-mono);font-size:11px;color:var(--t2);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sw-val{font-family:var(--font-mono);font-size:10.5px;color:var(--t4);flex:0 0 auto;text-align:right;white-space:nowrap}
+.type-row{display:flex;align-items:baseline;gap:12px;padding:7px 0;border-bottom:1px solid var(--hairline);color:var(--t1)}
+.type-row:last-child{border-bottom:none}
+.type-row .k{flex:0 0 132px;font-family:var(--font-mono);font-size:10.5px;color:var(--t4)}
+.type-row .v{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tk{font-family:var(--font-mono);font-size:10.5px;color:var(--t3);letter-spacing:.9px}
+.note{font-size:12.5px;line-height:1.75;color:var(--t2)}
+.note b{color:var(--t1);font-weight:600}
+.note code{font-family:var(--font-mono);font-size:11.5px;color:var(--accent);background:var(--accent-soft);padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+
+<div class="pv-bar">
+  <div class="pv-brand"><b>AnimeDownloader</b><span>暗房 · DARKROOM</span></div>
+  <div class="pv-tabs" id="tabs">
+    <button class="on" data-t="gallery">画廊</button>
+    <button data-t="viewer">灯箱</button>
+    <button data-t="settings">设置</button>
+    <button data-t="tokens">设计令牌</button>
+  </div>
+  <button class="pv-toggle" id="themeBtn">◐ 切换亮色</button>
+  <div class="pv-acc">
+    <span class="lbl">WINDOWS ACCENT</span>
+    <div class="set" id="accSet">
+      <i class="on" data-c="#0078D4" title="Windows 默认蓝" style="background:#0078D4;color:#0078D4"></i>
+      <i data-c="#BF0077" title="品红" style="background:#BF0077;color:#BF0077"></i>
+      <i data-c="#00B7C3" title="青色" style="background:#00B7C3;color:#00B7C3"></i>
+      <i data-c="#107C10" title="绿色" style="background:#107C10;color:#107C10"></i>
+      <i data-c="#D13438" title="红色" style="background:#D13438;color:#D13438"></i>
+      <i data-c="#FFB900" title="琥珀（本改版最早的错误假设）" style="background:#FFB900;color:#FFB900"></i>
+    </div>
+  </div>
+  <div class="pv-note">1:1 样张 · 可真实悬停 / 切换亮暗 · 强调色即你的 Windows 强调色（此处可手动试色）</div>
+</div>
+
+<main>
+
+<!-- ============================ 画廊 ============================ -->
+<section class="panel on" id="panel-gallery">
+  <div class="win">
+    <div class="win-cap">
+      <div class="win-dots"><i></i><i></i><i></i></div>
+      <div class="win-title">AnimeDownloader</div>
+    </div>
+    <div class="app">
+      <!-- 导轨 -->
+      <nav class="rail">
+        <div class="rail-toggle" title="展开：应用标记 + 快捷键">
+          <svg class="ic" viewBox="0 0 16 16"><path d="M2 4h12v1.4H2zM2 7.3h12v1.4H2zM2 10.6h12V12H2z"/></svg>
+        </div>
+        <div class="rail-nav">
+          <div class="rail-item on" title="画廊">
+            <svg class="ic" viewBox="0 0 16 16"><path d="M2 3h5v5H2zM9 3h5v5H9zM2 9h5v4H2zM9 9h5v4H9z"/></svg>
+          </div>
+          <div class="rail-item" title="灯箱">
+            <svg class="ic" viewBox="0 0 16 16"><path d="M2 3h12v8H2zm-1 9h14v1.6H1z"/></svg>
+          </div>
+          <div class="rail-item" title="设置">
+            <svg class="ic" viewBox="0 0 16 16"><path d="M8 5.4A2.6 2.6 0 1 0 8 10.6 2.6 2.6 0 0 0 8 5.4zm6.3 3.4l1.3 1-1.3 2.3-1.6-.5-1.2 1.2.3 1.6-2.3 1.3-.1-1.7H7l-.1 1.7-2.3-1.3.3-1.6L3.7 11l-1.6.5L.8 9.2 2.1 8v-.1L.8 6.9l1.3-2.3 1.6.5L4.9 3.9 4.6 2.3 6.9 1l.1 1.6h2l.1-1.6 2.3 1.3-.3 1.6 1.2 1.2 1.6-.5 1.3 2.3-1.2 1.1z"/></svg>
+          </div>
+        </div>
+        <div class="rail-foot">
+          <svg class="ic" viewBox="0 0 16 16" style="width:18px;height:18px"><path d="M8 1l6 3.2v7.6L8 15 2 11.8V4.2zm0 2.3L4 5.4v5.2l4 2.1 4-2.1V5.4z"/></svg>
+        </div>
+      </nav>
+
+      <div class="main">
+        <!-- 命令条 -->
+        <div class="cmd">
+          <span class="lbl">图源</span>
+          <div class="combo"><span>Gelbooru</span>
+            <svg width="9" height="6" viewBox="0 0 9 6" fill="none"><path d="M1 1l3.5 3.5L8 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          </div>
+          <div class="vdiv"></div>
+          <span class="lbl">过滤</span>
+          <div class="seg" id="segNsfw">
+            <button class="on">屏蔽 NSFW</button><button>仅 NSFW</button><button>全部</button>
+          </div>
+          <div class="cmd-right">
+            <div class="status"><i class="dot idle"></i><span class="mono-sm">就绪</span></div>
+            <button class="btn"><svg class="ic" style="width:12px;height:12px" viewBox="0 0 16 16"><path d="M13.6 8a5.6 5.6 0 1 1-1.9-4.2V1.6h1.4v4h-4V7h2.6A4.2 4.2 0 1 0 12.2 8z"/></svg>刷新</button>
+            <button class="btn btn-icon" title="清理缩略图缓存">
+              <svg class="ic" style="width:13px;height:13px" viewBox="0 0 16 16"><path d="M6 2h4v1H6zM3 4h10v1.2H3zm1 2.4h8L11.7 14H4.3z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="body">
+          <!-- 头部 -->
+          <div class="g-head">
+            <div class="eyebrow">接触印相</div>
+            <div class="display">灵感画廊</div>
+            <div class="hint">Gelbooru · 共 24 张图片</div>
+            <div class="rule"></div>
+            <div class="filters">
+              <div class="tagbox">
+                <svg class="ic" style="width:12px;height:12px;margin-left:8px;color:var(--t3)" viewBox="0 0 16 16"><path d="M10.3 10.3a5 5 0 1 1 .8-.8l3 3-.8.8zM7 10.2A3.2 3.2 0 1 0 7 3.8a3.2 3.2 0 0 0 0 6.4z"/></svg>
+                <span class="ph">输入标签搜索（回车应用）</span>
+                <div class="mini">
+                  <svg class="ic" style="width:11px;height:11px" viewBox="0 0 16 16"><path d="M14.4 7.3L8.5 1.4A1.6 1.6 0 0 0 7.3 1H2.4A1.4 1.4 0 0 0 1 2.4v4.9c0 .4.2.8.5 1.1l5.9 5.9c.6.6 1.6.6 2.2 0l4.8-4.8c.6-.6.6-1.6 0-2.2zM4.2 5.6a1.4 1.4 0 1 1 0-2.8 1.4 1.4 0 0 1 0 2.8z"/></svg>
+                </div>
+              </div>
+              <div class="chip">标签：landscape <span class="x">✕</span></div>
+              <div class="vdiv"></div>
+              <button class="tgl on">随机模式</button>
+              <button class="tgl">自动刷新</button>
+            </div>
+          </div>
+
+          <!-- 相纸网格 -->
+          <div class="sheet" id="sheet"></div>
+
+          <!-- 页脚轨道 -->
+          <div class="foot">
+            <div class="foot-left">
+              <i class="dot idle"></i>
+              <svg class="spin" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/></svg>
+              <span class="mono-sm">Gelbooru · 共 24 张图片</span>
+            </div>
+            <div class="foot-right">
+              <span class="mono-strong" style="margin-right:4px">第 3 页</span>
+              <button class="btn btn-icon"><svg class="ic" style="width:13px;height:13px" viewBox="0 0 16 16"><path d="M10.5 2.5L5 8l5.5 5.5-1 1L3 8l6.5-6.5z"/></svg></button>
+              <button class="btn btn-icon"><svg class="ic" style="width:13px;height:13px" viewBox="0 0 16 16"><path d="M5.5 2.5L11 8l-5.5 5.5 1 1L13 8 6.5 1.5z"/></svg></button>
+              <button class="btn btn-primary"><svg class="ic" style="width:12px;height:12px" viewBox="0 0 16 16"><path d="M14.4 7.3L8.5 1.4A1.6 1.6 0 0 0 7.3 1H2.4A1.4 1.4 0 0 0 1 2.4v4.9c0 .4.2.8.5 1.1l5.9 5.9c.6.6 1.6.6 2.2 0l4.8-4.8c.6-.6.6-1.6 0-2.2z"/></svg>下载全部</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 灯箱 ============================ -->
+<section class="panel" id="panel-viewer">
+  <div class="win">
+    <div class="win-cap">
+      <div class="win-dots"><i></i><i></i><i></i></div>
+      <div class="win-title">AnimeDownloader</div>
+    </div>
+    <div class="app">
+      <nav class="rail">
+        <div class="rail-toggle">
+          <svg class="ic" viewBox="0 0 16 16"><path d="M2 4h12v1.4H2zM2 7.3h12v1.4H2zM2 10.6h12V12H2z"/></svg>
+        </div>
+        <div class="rail-nav">
+          <div class="rail-item" title="画廊">
+            <svg class="ic" viewBox="0 0 16 16"><path d="M2 3h5v5H2zM9 3h5v5H9zM2 9h5v4H2zM9 9h5v4H9z"/></svg>
+          </div>
+          <div class="rail-item on" title="灯箱">
+            <svg class="ic" viewBox="0 0 16 16"><path d="M2 3h12v8H2zm-1 9h14v1.6H1z"/></svg>
+          </div>
+          <div class="rail-item" title="设置">
+            <svg class="ic" viewBox="0 0 16 16"><path d="M8 5.4A2.6 2.6 0 1 0 8 10.6 2.6 2.6 0 0 0 8 5.4zm6.3 3.4l1.3 1-1.3 2.3-1.6-.5-1.2 1.2.3 1.6-2.3 1.3-.1-1.7H7l-.1 1.7-2.3-1.3.3-1.6L3.7 11l-1.6.5L.8 9.2 2.1 8v-.1L.8 6.9l1.3-2.3 1.6.5L4.9 3.9 4.6 2.3 6.9 1l.1 1.6h2l.1-1.6 2.3 1.3-.3 1.6 1.2 1.2 1.6-.5 1.3 2.3-1.2 1.1z"/></svg>
+          </div>
+        </div>
+        <div class="rail-foot">
+          <svg class="ic" viewBox="0 0 16 16" style="width:18px;height:18px"><path d="M8 1l6 3.2v7.6L8 15 2 11.8V4.2zm0 2.3L4 5.4v5.2l4 2.1 4-2.1V5.4z"/></svg>
+        </div>
+      </nav>
+
+      <div class="main">
+        <div class="cmd">
+          <span class="lbl">图源</span>
+          <div class="combo"><span>Gelbooru</span>
+            <svg width="9" height="6" viewBox="0 0 9 6" fill="none"><path d="M1 1l3.5 3.5L8 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          </div>
+          <div class="vdiv"></div>
+          <span class="lbl">过滤</span>
+          <div class="seg"><button class="on">屏蔽 NSFW</button><button>仅 NSFW</button><button>全部</button></div>
+          <div class="cmd-right">
+            <div class="status" style="max-width:280px">
+              <div style="width:26px;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--hairline-strong);flex:0 0 26px">
+                <img src="https://picsum.photos/seed/plate07/80/80" alt="" style="width:100%;height:100%;object-fit:cover">
+              </div>
+              <i class="dot busy"></i><span class="mono-sm">已加载原图</span>
+            </div>
+            <button class="btn"><svg class="ic" style="width:12px;height:12px" viewBox="0 0 16 16"><path d="M13.6 8a5.6 5.6 0 1 1-1.9-4.2V1.6h1.4v4h-4V7h2.6A4.2 4.2 0 1 0 12.2 8z"/></svg>刷新</button>
+            <button class="btn btn-icon">
+              <svg class="ic" style="width:13px;height:13px" viewBox="0 0 16 16"><path d="M6 2h4v1H6zM3 4h10v1.2H3zm1 2.4h8L11.7 14H4.3z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="body">
+          <div class="v-head">
+            <div>
+              <div class="eyebrow">灯箱</div>
+              <div class="v-meta">Gelbooru · 1536 × 2048 · 3.2 MB</div>
+            </div>
+            <div class="v-links">
+              <button class="lnk">打开来源</button>
+              <button class="lnk">SauceNAO 反搜</button>
+              <button class="lnk">IQDB 反搜</button>
+              <button class="btn btn-icon"><svg class="ic" style="width:13px;height:13px" viewBox="0 0 16 16"><path d="M5.5 1.5h3.2v1.4H6.9v2.4H5.5zM1.5 5.5h1.4v2.9H1.5zm11.6 0h1.4v2.9h-1.4zm-9.1 3.6h1.4v2.4h1.8v1.4H4zm8.5 0h1.4v4.6H9.6v-1.4h2.9zM6.9 12.9h2.9v1.4H6.9z"/></svg></button>
+            </div>
+          </div>
+
+          <div class="tagstrip">
+            <span class="lbl">标签（点击浏览该标签下的图片）</span>
+            <div class="taglist">
+              <span class="tagc">1girl</span><span class="tagc">landscape</span><span class="tagc">sky</span>
+              <span class="tagc">blue_eyes</span><span class="tagc">original</span><span class="tagc">scenery</span>
+              <span class="tagc">clouds</span>
+            </div>
+          </div>
+
+          <div class="table">
+            <img src="https://picsum.photos/seed/plate07/900/900" alt="">
+            <div class="ichips">
+              <span class="ichip">kuro_bara</span>
+              <span class="ichip">1536 × 2048</span>
+            </div>
+            <div class="toolbar">
+              <button class="btn btn-icon" title="换一张"><svg class="ic" style="width:14px;height:14px" viewBox="0 0 16 16"><path d="M13.6 8a5.6 5.6 0 1 1-1.9-4.2V1.6h1.4v4h-4V7h2.6A4.2 4.2 0 1 0 12.2 8z"/></svg></button>
+              <button class="btn btn-icon" title="保存"><svg class="ic" style="width:14px;height:14px" viewBox="0 0 16 16"><path d="M8 1.6v8l2.8-2.8 1 1L8 11.6 4.2 7.8l1-1L8 9.6v-8zM2.4 12.4h11.2V14H2.4z"/></svg></button>
+              <span class="sep"></span>
+              <button class="btn btn-icon"><svg class="ic" style="width:14px;height:14px" viewBox="0 0 16 16"><path d="M7.3 2.4h1.4v5.3h5.3v1.4H8.7v5.3H7.3V9.1H2V7.7h5.3z" transform="scale(.8) translate(2 2)"/></svg></button>
+              <span class="zoom">100%</span>
+              <button class="btn btn-icon"><svg class="ic" style="width:14px;height:14px" viewBox="0 0 16 16"><path d="M2 7.3h12v1.4H2z"/></svg></button>
+              <span class="sep"></span>
+              <button class="btn btn-icon"><svg class="ic" style="width:14px;height:14px" viewBox="0 0 16 16"><path d="M2 2h5v1.4H3.4V7H2zm7 0h5v5h-1.4V3.4H9zM2 9h1.4v3.6H7V14H2zm10.6 0H14v5H9v-1.4h3.6z"/></svg></button>
+              <button class="btn btn-icon"><svg class="ic" style="width:14px;height:14px" viewBox="0 0 16 16"><path d="M2 2h12v12H2zm1.4 1.4v9.2h9.2V3.4z"/></svg></button>
+              <button class="btn btn-icon"><svg class="ic" style="width:14px;height:14px" viewBox="0 0 16 16"><path d="M6 1.6h8.4V10H13V3H6zM1.6 6H10v8.4H1.6zm1.4 1.4v5.6h5.6V7.4z"/></svg></button>
+              <span class="sep"></span>
+              <button class="btn btn-icon" title="全屏"><svg class="ic" style="width:14px;height:14px" viewBox="0 0 16 16"><path d="M2 2h4.6v1.4H3.4v3.2H2zm7.4 0H14v4.6h-1.4V3.4H9.4zM2 9.4h1.4v3.2h3.2V14H2zm10.6 0H14V14H9.4v-1.4h3.2z"/></svg></button>
+            </div>
+          </div>
+
+          <div class="foot" style="height:42px;flex-basis:42px">
+            <div class="foot-left"><i class="dot idle"></i><span class="mono-sm">就绪</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 设置 ============================ -->
+<section class="panel" id="panel-settings">
+  <div class="win">
+    <div class="win-cap">
+      <div class="win-dots"><i></i><i></i><i></i></div>
+      <div class="win-title">AnimeDownloader</div>
+    </div>
+    <div class="app">
+      <nav class="rail">
+        <div class="rail-toggle">
+          <svg class="ic" viewBox="0 0 16 16"><path d="M2 4h12v1.4H2zM2 7.3h12v1.4H2zM2 10.6h12V12H2z"/></svg>
+        </div>
+        <div class="rail-nav">
+          <div class="rail-item" title="画廊">
+            <svg class="ic" viewBox="0 0 16 16"><path d="M2 3h5v5H2zM9 3h5v5H9zM2 9h5v4H2zM9 9h5v4H9z"/></svg>
+          </div>
+          <div class="rail-item" title="灯箱">
+            <svg class="ic" viewBox="0 0 16 16"><path d="M2 3h12v8H2zm-1 9h14v1.6H1z"/></svg>
+          </div>
+          <div class="rail-item on" title="设置">
+            <svg class="ic" viewBox="0 0 16 16"><path d="M8 5.4A2.6 2.6 0 1 0 8 10.6 2.6 2.6 0 0 0 8 5.4zm6.3 3.4l1.3 1-1.3 2.3-1.6-.5-1.2 1.2.3 1.6-2.3 1.3-.1-1.7H7l-.1 1.7-2.3-1.3.3-1.6L3.7 11l-1.6.5L.8 9.2 2.1 8v-.1L.8 6.9l1.3-2.3 1.6.5L4.9 3.9 4.6 2.3 6.9 1l.1 1.6h2l.1-1.6 2.3 1.3-.3 1.6 1.2 1.2 1.6-.5 1.3 2.3-1.2 1.1z"/></svg>
+          </div>
+        </div>
+        <div class="rail-foot">
+          <svg class="ic" viewBox="0 0 16 16" style="width:18px;height:18px"><path d="M8 1l6 3.2v7.6L8 15 2 11.8V4.2zm0 2.3L4 5.4v5.2l4 2.1 4-2.1V5.4z"/></svg>
+        </div>
+      </nav>
+
+      <div class="main">
+        <div class="cmd">
+          <span class="lbl">图源</span>
+          <div class="combo"><span>Gelbooru</span>
+            <svg width="9" height="6" viewBox="0 0 9 6" fill="none"><path d="M1 1l3.5 3.5L8 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          </div>
+          <div class="vdiv"></div>
+          <span class="lbl">过滤</span>
+          <div class="seg"><button class="on">屏蔽 NSFW</button><button>仅 NSFW</button><button>全部</button></div>
+          <div class="cmd-right">
+            <div class="status"><i class="dot idle"></i><span class="mono-sm">就绪</span></div>
+            <button class="btn"><svg class="ic" style="width:12px;height:12px" viewBox="0 0 16 16"><path d="M13.6 8a5.6 5.6 0 1 1-1.9-4.2V1.6h1.4v4h-4V7h2.6A4.2 4.2 0 1 0 12.2 8z"/></svg>刷新</button>
+            <button class="btn btn-icon">
+              <svg class="ic" style="width:13px;height:13px" viewBox="0 0 16 16"><path d="M6 2h4v1H6zM3 4h10v1.2H3zm1 2.4h8L11.7 14H4.3z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="body">
+          <div class="s-wrap">
+            <div class="eyebrow">偏好设置</div>
+            <div style="font-family:var(--font-display);font-size:26px;font-weight:600;letter-spacing:-.55px;margin-top:5px">设置</div>
+            <div class="hint" style="margin-top:4px">调整图源、网络与下载行为，保存后立即生效</div>
+
+            <div class="s-grid" style="margin-top:30px">
+              <div class="s-group">通用</div>
+              <div>
+                <div class="row">
+                  <div class="txt"><div class="t">NSFW 过滤</div></div>
+                  <div class="seg"><button class="on">屏蔽 NSFW</button><button>仅 NSFW</button><button>全部</button></div>
+                </div>
+                <div class="row">
+                  <div class="txt"><div class="t">主题</div></div>
+                  <div class="seg"><button>跟随系统</button><button class="on">暗色</button><button>亮色</button></div>
+                </div>
+                <div class="row">
+                  <div class="txt"><div class="t">自动刷新</div><div class="d">按设定间隔自动重新加载画廊</div></div>
+                  <div class="num">30<span class="sp">▲<br>▼</span></div>
+                  <div class="sw on"><i></i></div>
+                </div>
+                <div class="row">
+                  <div class="txt"><div class="t">画廊每页数量</div><div class="d">随机模式下一次加载的图片数（1–48）</div></div>
+                  <div class="num">24<span class="sp">▲<br>▼</span></div>
+                </div>
+              </div>
+
+              <div class="s-group" style="padding-top:15px">网络与代理</div>
+              <div>
+                <div class="row" style="display:block">
+                  <div class="t">手动代理地址</div>
+                  <div class="d" style="margin-bottom:9px">留空自动检测系统代理（HTTP CONNECT 与 SOCKS5 均可）</div>
+                  <div style="max-width:420px;height:32px;display:flex;align-items:center;padding:0 12px;background:var(--surface);border:1px solid var(--hairline-strong);border-radius:var(--r-control);font-family:var(--font-mono);font-size:12px;color:var(--t3)">socks5://127.0.0.1:1088</div>
+                </div>
+                <div class="row">
+                  <div class="txt"><div class="t">请求超时</div><div class="d">单次网络请求的超时时间（5–120 秒）</div></div>
+                  <div class="num">20<span class="sp">▲<br>▼</span></div>
+                </div>
+                <div class="row">
+                  <div class="txt"><div class="t">不使用代理</div><div class="d">忽略系统代理与手动代理，全部直连</div></div>
+                  <div class="cb"></div>
+                </div>
+              </div>
+
+              <div class="s-group" style="padding-top:15px">下载</div>
+              <div>
+                <div class="row">
+                  <div class="txt"><div class="t">最大并发下载数</div><div class="d">同时下载缩略图与图片的连接数（1–16）</div></div>
+                  <div class="num">4<span class="sp">▲<br>▼</span></div>
+                </div>
+                <div class="row">
+                  <div class="txt"><div class="t">缩略图缓存</div><div class="d">内存 + 磁盘缓存，重复加载画廊几乎零等待</div></div>
+                  <div class="sw on"><i></i></div>
+                </div>
+                <div class="row">
+                  <div class="txt"><div class="t">清理缩略图缓存</div><div class="d">删除磁盘缓存，画廊缩略图将重新联网加载</div></div>
+                  <button class="btn">清理缓存</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="s-actions">
+              <button class="btn btn-primary">保存设置</button>
+              <button class="btn">恢复默认</button>
+              <span class="mono-sm" style="margin-left:6px">已保存 · 12:04</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 令牌 ============================ -->
+<section class="panel" id="panel-tokens">
+  <div class="tok">
+    <div class="card">
+      <h3>中性阶 · SURFACES</h3>
+      <div class="sw-row"><span class="sw-box" style="background:var(--canvas)"></span><span class="sw-name">AppBackgroundBrush</span><span class="sw-val" id="v-canvas"></span></div>
+      <div class="sw-row"><span class="sw-box" style="background:var(--rail)"></span><span class="sw-name">AppRailBrush</span><span class="sw-val" id="v-rail"></span></div>
+      <div class="sw-row"><span class="sw-box" style="background:var(--surface)"></span><span class="sw-name">AppCardFillBrush</span><span class="sw-val" id="v-surface"></span></div>
+      <div class="sw-row"><span class="sw-box" style="background:var(--sunken)"></span><span class="sw-name">AppSurfaceSunkenBrush</span><span class="sw-val" id="v-sunken"></span></div>
+      <div class="sw-row"><span class="sw-box" style="background:var(--viewer)"></span><span class="sw-name">AppViewerBackgroundBrush</span><span class="sw-val" id="v-viewer"></span></div>
+      <div class="sw-row"><span class="sw-box" style="background:var(--hairline)"></span><span class="sw-name">AppHairlineBrush</span><span class="sw-val" id="v-hair"></span></div>
+      <div class="sw-row"><span class="sw-box" style="background:var(--hairline-strong)"></span><span class="sw-name">AppHairlineStrongBrush</span><span class="sw-val" id="v-hair2"></span></div>
+    </div>
+
+    <div class="card">
+      <h3>安全灯 · ACCENT（唯一彩色 · 取自 Windows）</h3>
+      <div class="sw-row"><span class="sw-box" style="background:var(--accent)"></span><span class="sw-name">AppAccentBrush</span><span class="sw-val" id="v-accent"></span></div>
+      <div class="sw-row"><span class="sw-box" style="background:var(--accent-strong)"></span><span class="sw-name">AppAccentStrongBrush</span><span class="sw-val" id="v-accent2"></span></div>
+      <div class="sw-row"><span class="sw-box" style="background:var(--accent-soft)"></span><span class="sw-name">AppAccentSoftBrush</span><span class="sw-val" id="v-accent3"></span></div>
+      <div class="sw-row"><span class="sw-box" style="background:var(--accent-line)"></span><span class="sw-name">AppAccentLineBrush</span><span class="sw-val" id="v-accent4"></span></div>
+      <div class="sw-row"><span class="sw-box" style="background:var(--accent-ink)"></span><span class="sw-name">AppAccentInkBrush</span><span class="sw-val" id="v-accent5"></span></div>
+      <div class="sw-row" style="margin-top:16px"><span class="sw-box" style="background:var(--idle)"></span><span class="sw-name">就绪（无光源）</span><span class="sw-val">idle</span></div>
+      <div class="sw-row"><span class="sw-box" style="background:var(--error)"></span><span class="sw-name">故障</span><span class="sw-val">error</span></div>
+      <p class="note" style="margin:14px 0 0">全应用只有这一个彩色，且只在三种语义上亮起：<b>正在被选中 / 正在进行 / 需要你注意</b>。</p>
+      <p class="note" style="margin:10px 0 0">
+        <b>它不是一个常数。</b>暗色取 <code>SystemAccentColor</code>，亮色下压一档到 <code>Dark1</code>（避免在浅底上对比不足）；
+        墨色按 <b>WCAG 相对亮度 &gt; 0.4</b> 自动在深墨 <code>#141518</code> 与白之间切换。试试点顶部的
+        <b>#FFB900</b>：<b>暗色</b>下它会转成深墨，<b>亮色</b>下它先下沉一档、墨色又回到白 —— 同一个颜色、两种底色，两套正确解。
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>字阶 · TYPE SCALE</h3>
+      <div class="type-row"><span class="k">Display 32</span><span class="v" style="font-family:var(--font-display);font-size:32px;font-weight:600;letter-spacing:-.8px">灵感画廊</span></div>
+      <div class="type-row"><span class="k">Section 26</span><span class="v" style="font-family:var(--font-display);font-size:26px;font-weight:600;letter-spacing:-.55px">设置</span></div>
+      <div class="type-row"><span class="k">Eyebrow 10.5 mono</span><span class="v tk">接触印相</span></div>
+      <div class="type-row"><span class="k">CardTitle 14</span><span class="v" style="font-size:14px;font-weight:600">Gelbooru API 凭据</span></div>
+      <div class="type-row"><span class="k">Body 13</span><span class="v" style="font-size:13px;color:var(--t2)">同时下载缩略图与图片的连接数</span></div>
+      <div class="type-row"><span class="k">Caption 11.5 mono</span><span class="v" style="font-family:var(--font-mono);font-size:11.5px;color:var(--t3)">Gelbooru · 共 24 张图片</span></div>
+      <div class="type-row"><span class="k">MonoStrong 12</span><span class="v mono-strong">第 3 页 · 100%</span></div>
+      <p class="note" style="margin:14px 0 0"><b>所有数字走等宽</b>：页码、分辨率、缩放百分比、版本、快捷键、路径。这一条几乎不花成本，却把界面从"网页"拉到"仪器"。</p>
+    </div>
+
+    <div class="card">
+      <h3>层级 · ELEVATION（无阴影）</h3>
+      <p class="note">
+        层级<b>完全不用阴影</b>，只用「表面色阶 + 1px 极细线」：
+      </p>
+      <div style="margin-top:12px">
+        <div style="height:34px;border-radius:6px 6px 0 0;background:var(--canvas);border:1px solid var(--hairline);border-bottom:none;display:flex;align-items:center;padding:0 12px" class="tk">0 · canvas 房间</div>
+        <div style="height:34px;background:var(--surface);border:1px solid var(--hairline);border-bottom:none;display:flex;align-items:center;padding:0 12px" class="tk">1 · surface 相纸</div>
+        <div style="height:34px;background:var(--surface-hover);border:1px solid var(--hairline);border-bottom:none;display:flex;align-items:center;padding:0 12px" class="tk">2 · surface-hover 悬停抬升</div>
+        <div style="height:34px;border-radius:0 0 6px 6px;background:var(--sunken);border:1px solid var(--hairline);display:flex;align-items:center;padding:0 12px" class="tk">3 · sunken 凹槽（输入 / 分段器）</div>
+      </div>
+      <p class="note" style="margin:14px 0 0">
+        悬停填充统一是 <code>rgba(255,255,255,.06)</code> —— <b>只加白，不吃色相</b>，因此不会在暗底上泛出色偏。所有按钮按压只用填充变化，<b>不用缩放</b>。
+      </p>
+    </div>
+
+    <div class="card" style="grid-column:1/-1">
+      <h3>这次改了什么 · WHAT CHANGED</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px">
+        <div class="note"><b>导航与工具分家</b><br>320px 常开侧栏 → 56px 图标导轨 + 常驻命令条。内容区多出 264px，换图源不再需要先展开侧栏。</div>
+        <div class="note"><b>画廊改按接触印相排版</b><br>三条功能带 → 眉标/展板标题/说明/细线/筛选行；翻页与批量下载下放到页脚轨道。</div>
+        <div class="note"><b>灯箱压薄上下边框</b><br>没有大标题去抢图片的垂直空间；图片台面做成嵌进桌面的深色凹槽。</div>
+        <div class="note"><b>设置去卡片化</b><br>Win11 设置复刻 → 双栏参数表：左栏分组名，右栏逐行参数，只用 1px 细线分隔。</div>
+        <div class="note"><b>强调色交还给 Windows</b><br>改版一度把强调色钉成琥珀，但用户选定的系统色被无视、应用在系统里像"外人"。现在 <code>AppAccent*</code> 直接接 <code>SystemAccentColor*</code>，由服务运行时跟随个性化设置，墨色按亮度自动取黑/白。</div>
+        <div class="note"><b>数字全部等宽</b><br>页码、分辨率、百分比、版本、快捷键统一走 Cascadia Mono。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+/* ---- 相纸网格：离线安全（渐变兜底 + 远程图） ---- */
+(function(){
+  var hues=[24,196,42,268,8,160,300,52,220,120,332,84,180,288,14,204,66,240,340,100,170,20,300,140];
+  var sheet=document.getElementById('sheet');
+  if(!sheet) return;
+  var res=['1536×2048','1920×1080','2048×2048','1600×2400','2560×1440','1200×1600','1440×1920','3840×2160'];
+  var artists=['kuro_bara','yuu_kawakami','hoshino','asagiri_ren','mika_tsu','north_gate','sablewood','aoi_h'];
+  for(var i=0;i<24;i++){
+    var h=hues[i%hues.length];
+    var a='linear-gradient('+(h+40)+'deg,hsl('+h+' 34% 22%),hsl('+((h+58)%360)+' 40% 12%))';
+    var d=document.createElement('div');
+    d.className='plate';
+    d.style.background=a;
+    d.innerHTML=
+      '<img loading="lazy" alt="" src="https://picsum.photos/seed/plate'+String(i+1).padStart(2,'0')+'/420/420" style="opacity:0;transition:opacity .3s"'+
+      ' onload="this.style.opacity=1" onerror="this.remove()">'+
+      '<span class="res">'+res[i%res.length]+'</span>'+
+      '<div class="scrim">'+artists[i%artists.length].toUpperCase()+'</div>'+
+      '<div class="acts">'+
+        '<button class="ov-btn" title="打开大图"><svg viewBox="0 0 16 16" style="width:12px;height:12px;fill:currentColor"><path d="M5 2.4l9 5.6-9 5.6z"/></svg></button>'+
+        '<button class="ov-btn" title="保存"><svg viewBox="0 0 16 16" style="width:12px;height:12px;fill:currentColor"><path d="M8 1.6v8l2.8-2.8 1 1L8 11.6 4.2 7.8l1-1L8 9.6v-8zM2.4 12.4h11.2V14H2.4z"/></svg></button>'+
+      '</div>';
+    sheet.appendChild(d);
+  }
+})();
+
+/* ---- 分段器 / 开关的演示交互 ---- */
+document.querySelectorAll('.seg').forEach(function(g){
+  g.addEventListener('click',function(e){
+    var b=e.target.closest('button'); if(!b) return;
+    g.querySelectorAll('button').forEach(function(x){x.classList.remove('on')});
+    b.classList.add('on');
+  });
+});
+document.querySelectorAll('.tgl').forEach(function(b){
+  b.addEventListener('click',function(){b.classList.toggle('on')});
+});
+document.querySelectorAll('.sw').forEach(function(b){
+  b.addEventListener('click',function(){b.classList.toggle('off')});
+});
+document.querySelectorAll('.cb').forEach(function(b){
+  b.addEventListener('click',function(){b.classList.toggle('on')});
+});
+
+/* ---- 标签页 ---- */
+document.getElementById('tabs').addEventListener('click',function(e){
+  var b=e.target.closest('button'); if(!b) return;
+  document.querySelectorAll('#tabs button').forEach(function(x){x.classList.remove('on')});
+  b.classList.add('on');
+  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('on')});
+  document.getElementById('panel-'+b.dataset.t).classList.add('on');
+});
+
+/* ---- 令牌读数 ----
+   两个曾经并存的小 bug（导致这一列一直是空的）：
+   1) Id 不能带 '#' 前缀 —— getElementById('#v-canvas') 永远返回 null，整列被跳过；
+   2) 键名必须是 CSS 变量的 kebab 写法（accent-strong，不是 accentStrong），
+      否则 getPropertyValue('--accentStrong') 恒为空。 */
+function readTokens(){
+  var cs=getComputedStyle(document.documentElement);
+  var map={canvas:'v-canvas',rail:'v-rail',surface:'v-surface',sunken:'v-sunken',viewer:'v-viewer',
+           hairline:'v-hair','hairline-strong':'v-hair2',
+           accent:'v-accent','accent-strong':'v-accent2','accent-soft':'v-accent3',
+           'accent-line':'v-accent4','accent-ink':'v-accent5'};
+  Object.keys(map).forEach(function(k){
+    var el=document.getElementById(map[k]); if(!el) return;
+    var v=cs.getPropertyValue('--'+k).trim();
+    el.textContent=v || '—';
+  });
+}
+
+/* ---- 强调色 = Windows 强调色（本页手动模拟系统个性化设置） ----
+   与 WindowsColorScheme.cs 同一套算法：暗色用原值、亮色下沉一档（Dark1）；
+   soft / line 是同色相的 alpha；墨色按 WCAG 相对亮度判定，阈值 0.4。 */
+var ACCENT_ALPHA={dark:{soft:.16,line:.42},light:{soft:.12,line:.45}};
+var INK_THRESHOLD=0.4;
+var currentAccent='#0078D4';
+
+function hexToRgb(h){
+  h=h.replace('#','');
+  if(h.length===3) h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  var n=parseInt(h,16);
+  return [n>>16&255,n>>8&255,n&255];
+}
+function channelLuminance(c){
+  c/=255;
+  return c<=0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055,2.4);
+}
+function luminance(h){
+  var r=hexToRgb(h);
+  return 0.2126*channelLuminance(r[0])+0.7152*channelLuminance(r[1])+0.0722*channelLuminance(r[2]);
+}
+/* 近似 Windows 的 Light1 / Dark1 档位：按比例向白 / 黑位移 */
+function shade(h,amount){
+  var rgb=hexToRgb(h).map(function(c){
+    return Math.max(0,Math.min(255,Math.round(amount>=0 ? c+(255-c)*amount : c*(1+amount))));
+  });
+  return '#'+rgb.map(function(c){ return ('0'+c.toString(16)).slice(-2); }).join('');
+}
+function inkFor(h){ return luminance(h)>INK_THRESHOLD ? '#141518' : '#FFFFFF'; }
+
+function applyAccent(hex){
+  currentAccent=hex;
+  var dark=document.documentElement.getAttribute('data-theme')==='dark';
+  var base   = dark ? hex : shade(hex,-0.30);   /* 亮色下沉一档（主色 / 描边 / 墨色基准） */
+  var strong = dark ? shade(hex, 0.24) : shade(hex,-0.45);
+  /* 底衬始终用系统原色：浅底上的 12% 淡衬要"发光"，压深了反而糊成一团灰 */
+  var softBase = dark ? base : hex;
+  var a=dark ? ACCENT_ALPHA.dark : ACCENT_ALPHA.light;
+  var softRgb=hexToRgb(softBase).join(',');
+  var lineRgb=hexToRgb(base).join(',');
+  var root=document.documentElement.style;
+  root.setProperty('--accent', base);
+  root.setProperty('--accent-strong', strong);
+  root.setProperty('--accent-soft', 'rgba('+softRgb+','+a.soft+')');
+  root.setProperty('--accent-line', 'rgba('+lineRgb+','+a.line+')');
+  root.setProperty('--accent-ink', inkFor(base));
+  root.setProperty('--focus', base);
+  readTokens();
+}
+
+document.getElementById('accSet').addEventListener('click',function(e){
+  var i=e.target.closest('i'); if(!i) return;
+  document.querySelectorAll('#accSet i').forEach(function(x){x.classList.remove('on')});
+  i.classList.add('on');
+  applyAccent(i.dataset.c);
+});
+
+/* ---- 亮暗切换 ---- */
+var btn=document.getElementById('themeBtn');
+btn.addEventListener('click',function(){
+  var cur=document.documentElement.getAttribute('data-theme');
+  var next=cur==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',next);
+  btn.textContent = next==='dark' ? '◐ 切换亮色' : '◑ 切换暗色';
+  applyAccent(currentAccent);   /* 两套主题的档位与 alpha 不同，必须重算 */
+});
+
+applyAccent(currentAccent);
+</script>
+</body>
+</html>

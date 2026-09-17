@@ -2,12 +2,19 @@
     x:Class="AnimeDownloader.App.Controls.SegmentedControl"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--
+        细线分段器
+        ============================================================================
+        容器只是一道 1px 极细线围出来的凹槽，本身几乎不可见；
+        「当前选项」由选项自己的琥珀底衬表达（见 AppSegmentRadioStyle）。
+        这样过滤器在命令条里安静地存在，而不是像一排彩色按钮一样抢注意力。
+    -->
     <Border x:Name="Shell"
-            Background="{ThemeResource AppTagChipBrush}"
-            BorderBrush="{ThemeResource AppCardStrokeBrush}"
+            Background="{ThemeResource AppSurfaceSunkenBrush}"
+            BorderBrush="{ThemeResource AppHairlineBrush}"
             BorderThickness="1"
-            CornerRadius="10"
-            Padding="4">
+            CornerRadius="8"
+            Padding="3">
         <!-- Grid 星号列：整个区域宽度均分给每项（等宽），栏间零空隙 -->
         <Grid x:Name="ItemsHost" />
     </Border>

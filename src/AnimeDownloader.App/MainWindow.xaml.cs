@@ -4,14 +4,16 @@ using AnimeDownloader.Core.Services;
 using AnimeDownloader.Core.Sources;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace AnimeDownloader.App;
 
 /// <summary>
 /// Main window: owns app-wide shared state (settings, sources, HttpClient, selected source and
-/// NSFW mode) and switches between the gallery / viewer / settings pages. The global toolbar
-/// (source, NSFW filter, refresh, status) lives in the left navigation pane; pages react to
+/// NSFW mode) and switches between the gallery / viewer / settings pages. The 56px icon rail
+/// only carries navigation; the always-visible command bar above the frame owns the source
+/// picker, the NSFW filter, the status beacon and the refresh / cache actions. Pages react to
 /// changes through <see cref="IModePage"/>.
 /// </summary>
 #pragma warning disable CA1001 // Owned for the application lifetime and disposed on rebuild.
@@ -47,11 +49,16 @@ public sealed partial class MainWindow : Window
         Root.RequestedTheme = App.ResolveTheme(App.Settings.Theme);
         SetVersionText();
         SyncToolbarFromSettings();
-        ApplyPaneLayout(compact: false);
         SetLogoSource();
         Win11Chrome.SetIcon(this);
         Win11Chrome.Apply(this, Root);
-        Root.Loaded += (_, _) => Win11Chrome.Apply(this, Root);
+        Root.Loaded += (_, _) =>
+        {
+            Win11Chrome.Apply(this, Root);
+            // 首屏尺寸必须在 Loaded 之后给：需要 XamlRoot 的 DPI 换算，
+            // 在此之前窗口还是系统默认尺寸（默认尺寸下命令条基本是坏的）。
+            Win11Chrome.SetInitialBounds(this, Root);
+        };
         // 跟随用户 Windows 配色：注册主题根 + 标题栏随亮暗切换重上色。
         WindowsColorScheme.Instance.Register(Root);
         Root.ActualThemeChanged += (_, _) => Win11Chrome.ApplyAfterThemeChange(this, Root);
@@ -185,39 +192,7 @@ public sealed partial class MainWindow : Window
         StatusDot.Style = (Style)Application.Current.Resources[styleKey];
     }
 
-    private void OnNavigationLoaded(object sender, RoutedEventArgs e)
-    {
-        RootNav.SelectedItem = GalleryNavItem;
-    }
-
-    /// <summary>Expanded pane shows full controls and the status bar in the footer.</summary>
-    private void OnPaneOpening(NavigationView sender, object args)
-    {
-        ApplyPaneLayout(compact: false);
-    }
-
-    /// <summary>
-    /// Compact pane switches the controls to icon-only form: centered labels, arrow-only
-    /// combos, icon-only buttons and the app logo centered in the footer.
-    /// </summary>
-    private void OnPaneClosing(NavigationView sender, object args)
-    {
-        ApplyPaneLayout(compact: true);
-    }
-
-    private void ApplyPaneLayout(bool compact)
-    {
-        // 收起态隐藏图源/NSFW/刷新/清理控件区，只保留导航图标与底部 logo，
-        // 与“画廊/查看器/设置”三个原生导航项保持同一视觉体系；展开态显示完整控件。
-        PaneControls.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-
-        // 底部：收起态只显示居中的应用 logo，展开态显示状态栏
-        PaneFooterExpanded.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        PaneFooterCompact.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
-        PaneFooterCompact.Width = compact ? RootNav.CompactPaneLength : double.NaN;
-    }
-
-    /// <summary>Loads the app logo PNG (copied next to the exe) for the pane headers.</summary>
+    /// <summary>Loads the app logo PNG (copied next to the exe) for the rail mark.</summary>
     private void SetLogoSource()
     {
         var logoPath = Path.Combine(AppContext.BaseDirectory, "AnimeDownloader.png");
@@ -228,9 +203,7 @@ public sealed partial class MainWindow : Window
 
         try
         {
-            var logo = new BitmapImage(new Uri(logoPath));
-            HeaderLogo.Source = logo;
-            FooterLogo.Source = logo;
+            FooterLogo.Source = new BitmapImage(new Uri(logoPath));
         }
         catch (Exception)
         {
@@ -238,14 +211,43 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void OnNavigationSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
+    /// <summary>
+    /// 首帧：选中「画廊」并落到内容区。RadioButton 的 Checked 只在状态真正翻转时触发，
+    /// 因此这里同时兜底一次直接导航，避免启动时停在空 Frame 上。
+    /// </summary>
+    private void OnShellLoaded(object sender, RoutedEventArgs e)
     {
-        var tag = (args.SelectedItem as NavigationViewItem)?.Tag?.ToString() ?? "gallery";
-        NavigateTo(tag);
+        if (GalleryRailItem.IsChecked != true)
+        {
+            GalleryRailItem.IsChecked = true; // 触发 OnRailItemChecked → NavigateTo("gallery")
+            return;
+        }
+
+        if (_currentPage is null)
+        {
+            NavigateTo("gallery");
+        }
+    }
+
+    private void OnRailItemChecked(object sender, RoutedEventArgs e)
+    {
+        if (sender is RadioButton item &&
+            item.Tag?.ToString() is { Length: > 0 } tag)
+        {
+            NavigateTo(tag);
+        }
     }
 
     private void NavigateTo(string tag)
     {
+        // 全屏状态下换页（比如在灯箱里点标签跳回画廊）必须先把外壳恢复：
+        // 导轨与命令条是全屏时收起的，不恢复的话新页面上方会永远缺一条命令条，
+        // 而且没有任何入口能再退回来。
+        if (IsFullscreen)
+        {
+            SetFullscreen(false);
+        }
+
         if (!_pageCache.TryGetValue(tag, out var page))
         {
             page = tag switch
@@ -269,8 +271,60 @@ public sealed partial class MainWindow : Window
     /// <summary>Navigates to settings from contextual onboarding actions.</summary>
     public void NavigateToSettings()
     {
-        RootNav.SelectedItem = SettingsNavItem;
+        SettingsRailItem.IsChecked = true;
         NavigateTo("settings");
+    }
+
+    // ==================== 全屏（F11） ====================
+
+    /// <summary>窗口当前是否全屏。</summary>
+    public bool IsFullscreen => Win11Chrome.IsFullscreen(this);
+
+    /// <summary>切换整窗全屏。查看器等页面通过它进入全屏，而不是自己去动 AppWindow。</summary>
+    public void ToggleFullscreen() => SetFullscreen(!IsFullscreen);
+
+    /// <summary>退出全屏（已经不是全屏时是空操作）。</summary>
+    public void ExitFullscreen() => SetFullscreen(false);
+
+    /// <summary>
+    /// 整窗全屏开关。注意「全屏」是**外壳**的能力：导轨与命令条挂在 MainWindow 上，
+    /// 不归页面管。之前只有查看器收起了自己的页内控件，于是全屏之后左边 56px 导轨
+    /// 和顶上命令条原地不动 —— 窗口是满屏了，画面却仍被侧栏挤着。
+    /// </summary>
+    public void SetFullscreen(bool on)
+    {
+        if (on == IsFullscreen)
+        {
+            return;
+        }
+
+        Win11Chrome.SetFullscreen(this, Root, on);
+        ApplyImmersiveChrome(on);
+    }
+
+    private void ApplyImmersiveChrome(bool immersive)
+    {
+        // 导轨列宽必须跟着归零：只把 Border 折叠掉的话，56px 的列还在，内容区依旧被挤。
+        RailColumn.Width = immersive ? new GridLength(0) : new GridLength(56);
+        RailHost.Visibility = immersive ? Visibility.Collapsed : Visibility.Visible;
+        CommandBarHost.Visibility = immersive ? Visibility.Collapsed : Visibility.Visible;
+        (_currentPage as IImmersivePage)?.SetImmersive(immersive);
+    }
+
+    private void OnFullscreenAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        ToggleFullscreen();
+    }
+
+    private void OnShellKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        // 只认全屏状态下的 Esc，其余情况一律放行 —— 否则会抢掉弹层 / 下拉框的 Esc。
+        if (e.Key == Windows.System.VirtualKey.Escape && IsFullscreen)
+        {
+            e.Handled = true;
+            ExitFullscreen();
+        }
     }
 
     /// <summary>
@@ -288,7 +342,7 @@ public sealed partial class MainWindow : Window
         _currentSource.Tags = cleaned;
         _settings.SourceTags[_currentSource.Id] = cleaned;
         _settingsStore.Save(_settings);
-        RootNav.SelectedItem = GalleryNavItem;
+        GalleryRailItem.IsChecked = true;
         NavigateTo("gallery");
         (_currentPage as IModePage)?.OnSourceChanged();
         SetGlobalStatus($"已切换到标签视图：{cleaned}");
@@ -534,4 +588,13 @@ public interface IModePage
     void OnNsfwChanged();
 
     void Reload();
+}
+
+/// <summary>
+/// 整窗全屏时页面收起 / 恢复自己的页内控件。外壳的导轨与命令条由 <see cref="MainWindow"/>
+/// 自己处理；页面只负责自己那一层（例如查看器的浮动工具栏、状态条、标签区、内边距）。
+/// </summary>
+public interface IImmersivePage
+{
+    void SetImmersive(bool immersive);
 }

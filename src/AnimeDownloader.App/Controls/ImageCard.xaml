@@ -6,13 +6,27 @@
     PointerExited="OnPointerExited"
     KeyDown="OnCardKeyDown"
     IsTabStop="True"
-    AutomationProperties.Name="图片卡片">
+    AutomationProperties.Name="图片卡片"
+    HorizontalAlignment="Center"
+    VerticalAlignment="Center">
 
+    <!--
+        相纸（Plate）
+        ============================================================================
+        一张卡片 = 一张放在暗房台面上的相纸。默认状态几乎看不见「控件」：
+        只有一层比房间略亮的表面 + 一条 1px 极细线，让图片本身成为唯一焦点。
+        悬停时才浮现：整卡内描边提亮（HoverActions 里的全幅层）+ 打开/保存两枚快捷按钮。
+        元数据（作者、分辨率）一律等宽小字 —— 与画廊页脚、命令条同一套排版语言。
+
+        尺寸：宽高由 GalleryPage 的 UpdateGridLayout 显式 SetCardSize（= 瓦片 - 10px 间隙），
+        这里用 Center 对齐让它在瓦片里居中 —— 相邻两张之间就自然留出 10px 栏距。
+        悬停放大 1.04 也正好吃这点余量，不会顶到邻居。
+    -->
     <UserControl.Resources>
-        <!-- 微光扫过占位 -->
+        <!-- 微光扫过占位：极低对比的一道光，只提示「正在显影」，不闪烁 -->
         <LinearGradientBrush x:Key="ShimmerBrush" StartPoint="0,0" EndPoint="1,0">
             <GradientStop Offset="0" Color="#00FFFFFF" />
-            <GradientStop Offset="0.5" Color="#59FFFFFF" />
+            <GradientStop Offset="0.5" Color="#0FFFFFFF" />
             <GradientStop Offset="1" Color="#00FFFFFF" />
         </LinearGradientBrush>
     </UserControl.Resources>
@@ -29,10 +43,14 @@
                 <TranslateTransform x:Name="CardTranslate" Y="0" />
             </Grid.RenderTransform>
 
-            <Border x:Name="CardBorder" Style="{StaticResource AppCardBorderStyle}">
+            <Border x:Name="CardBorder"
+                    Background="{ThemeResource AppCardFillBrush}"
+                    BorderBrush="{ThemeResource AppHairlineBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource CardCornerRadius}">
                 <Grid x:Name="CardContent">
                     <!-- 微光占位层 -->
-                    <Border x:Name="ShimmerHost" CornerRadius="11" Background="{ThemeResource AppCardFillBrush}">
+                    <Border x:Name="ShimmerHost" CornerRadius="11" Background="{ThemeResource AppTrackFillBrush}">
                         <Border x:Name="ShimmerSlide" Width="360" HorizontalAlignment="Left"
                                 Background="{StaticResource ShimmerBrush}">
                             <Border.RenderTransform>
@@ -43,44 +61,57 @@
 
                     <Image x:Name="Thumb" Stretch="UniformToFill" Visibility="Collapsed" />
 
-                    <!-- 底部艺术家信息（渐变 + 文本，右侧预留操作按钮空间） -->
-                    <Border x:Name="ArtistScrim" VerticalAlignment="Bottom" Height="46"
+                    <!-- 底部作者：等宽大写小字，压在一条只到一半就散掉的渐变上 -->
+                    <Border x:Name="ArtistScrim" VerticalAlignment="Bottom" Height="52"
                             Background="{ThemeResource AppScrimBrush}"
+                            CornerRadius="0,0,11,11"
                             Visibility="Collapsed">
                         <TextBlock x:Name="ArtistText"
-                                   Style="{StaticResource AppCaptionTextStyle}"
-                                   FontSize="11.5"
-                                   Foreground="White"
-                                   FontWeight="SemiBold"
+                                   FontFamily="{StaticResource AppFontMono}"
+                                   FontSize="10.5"
+                                   CharacterSpacing="60"
+                                   Foreground="#FFF0F1F3"
                                    MaxLines="1"
-                                   Padding="10,8,92,8"
-                                   TextAlignment="Left" />
+                                   Padding="11,0,80,9"
+                                   VerticalAlignment="Bottom"
+                                   TextTrimming="CharacterEllipsis" />
                     </Border>
 
-                    <!-- 悬浮快捷操作：打开 + 保存 -->
-                    <StackPanel x:Name="HoverActions" Orientation="Horizontal" Spacing="4"
-                                HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                                Margin="0,0,8,8" Visibility="Collapsed">
-                        <Button x:Name="OpenButton" Style="{StaticResource AppSmallIconButtonStyle}"
-                                Background="#B3000000"
-                                Click="OnOpenClick"
-                                ToolTipService.ToolTip="打开大图（双击 / 回车）">
-                            <FontIcon Glyph="&#xE768;" FontSize="12" Foreground="White" />
-                        </Button>
-                        <Button x:Name="SaveButton" Style="{StaticResource AppSmallIconButtonStyle}"
-                                Background="#B3000000"
-                                Click="OnQuickSave"
-                                ToolTipService.ToolTip="保存到下载目录">
-                            <FontIcon Glyph="&#xE896;" FontSize="12" Foreground="White" />
-                        </Button>
-                    </StackPanel>
+                    <!--
+                        悬浮层：整卡内描边 + 右下角快捷操作。
+                        代码只驱动这一层的 Opacity，所以「整卡提亮」与「按钮浮现」天然同步。
+                    -->
+                    <Grid x:Name="HoverActions" Visibility="Collapsed">
+                        <!-- 全幅内描边：灯从上方照下来，纸的边缘先亮起来 -->
+                        <Border CornerRadius="11" Margin="0"
+                                BorderThickness="1"
+                                BorderBrush="{ThemeResource AppAccentLineBrush}"
+                                IsHitTestVisible="False" />
+                        <StackPanel Orientation="Horizontal" Spacing="5"
+                                    HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                    Margin="0,0,9,9">
+                            <Button x:Name="OpenButton" Style="{StaticResource AppOverlayIconButtonStyle}"
+                                    Click="OnOpenClick"
+                                    ToolTipService.ToolTip="打开大图（双击 / 回车）">
+                                <FontIcon Glyph="&#xE768;" FontSize="12" />
+                            </Button>
+                            <Button x:Name="SaveButton" Style="{StaticResource AppOverlayIconButtonStyle}"
+                                    Click="OnQuickSave"
+                                    ToolTipService.ToolTip="保存到下载目录">
+                                <FontIcon Glyph="&#xE74E;" FontSize="12" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
 
-                    <!-- 分辨率徽章 -->
+                    <!-- 分辨率：深色玻璃 + 等宽，属于「读数」而不是装饰 -->
                     <Border x:Name="ResBadge" HorizontalAlignment="Right" VerticalAlignment="Top"
-                            Margin="0,8,8,0" Visibility="Collapsed"
-                            CornerRadius="6" Background="#B3000000" Padding="7,3">
-                        <TextBlock x:Name="ResText" FontSize="10.5" Foreground="White"
-                                   FontWeight="SemiBold" />
+                            Margin="0,9,9,0" Visibility="Collapsed"
+                            CornerRadius="5" Background="#99070809" Padding="6,2">
+                        <TextBlock x:Name="ResText"
+                                   FontFamily="{StaticResource AppFontMono}"
+                                   FontSize="10"
+                                   CharacterSpacing="20"
+                                   Foreground="#FFE6E8EB" />
                     </Border>
                 </Grid>
             </Border>
@@ -88,14 +119,16 @@
             <!-- 加载失败覆盖层 -->
             <Border x:Name="ErrorOverlay"
                     Background="{ThemeResource AppCardFillBrush}"
+                    BorderBrush="{ThemeResource AppHairlineBrush}"
+                    BorderThickness="1"
                     CornerRadius="11"
                     Visibility="Collapsed">
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
-                    <FontIcon Glyph="&#xE7BA;" FontSize="24"
-                              Foreground="{ThemeResource AppTextSecondaryBrush}"
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6">
+                    <FontIcon Glyph="&#xE7BA;" FontSize="20"
+                              Foreground="{ThemeResource AppTextQuaternaryBrush}"
                               HorizontalAlignment="Center" />
                     <TextBlock x:Name="ErrorText" Text="加载失败" FontSize="11"
-                               Foreground="{ThemeResource AppTextSecondaryBrush}" />
+                               Foreground="{ThemeResource AppTextTertiaryBrush}" />
                 </StackPanel>
             </Border>
         </Grid>

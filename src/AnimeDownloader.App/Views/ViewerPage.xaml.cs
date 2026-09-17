@@ -16,7 +16,7 @@ namespace AnimeDownloader.App.Views;
 /// 键盘快捷键（空格 / 方向键换图，Ctrl+S 保存，F11 全屏，Esc 退出），
 /// 左下角显示作者与分辨率信息胶囊。
 /// </summary>
-public sealed partial class ViewerPage : Page, IModePage
+public sealed partial class ViewerPage : Page, IModePage, IImmersivePage
 {
     private MainWindow? _owner;
     private SettingsStore _settingsStore = null!;
@@ -349,18 +349,8 @@ public sealed partial class ViewerPage : Page, IModePage
                 e.Handled = true;
                 _ = LoadRandomAsync();
                 break;
-            case VirtualKey.F11:
-                e.Handled = true;
-                ToggleFullscreen();
-                break;
-            case VirtualKey.Escape:
-                if (IsFullscreen())
-                {
-                    e.Handled = true;
-                    ExitFullscreen();
-                }
-
-                break;
+            // F11 / 全屏下的 Esc 由 MainWindow 统一处理（窗口级加速器 + 外壳 KeyDown）：
+            // 页面自己也动 AppWindow 的话，会出现"窗口进了全屏、外壳却没收起"的半吊子状态。
             case VirtualKey.S when IsCtrlPressed():
                 e.Handled = true;
                 OnSave(sender, new RoutedEventArgs());
@@ -437,9 +427,6 @@ public sealed partial class ViewerPage : Page, IModePage
         Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control)
             .HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
 
-    private bool IsFullscreen() =>
-        _owner?.AppWindow.Presenter is Microsoft.UI.Windowing.FullScreenPresenter;
-
     private void OnViewAreaDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
         ToggleFullscreen();
@@ -452,37 +439,26 @@ public sealed partial class ViewerPage : Page, IModePage
 
     private void ToggleFullscreen()
     {
-        if (IsFullscreen())
+        _owner?.ToggleFullscreen();
+    }
+
+    // ---------------- IImmersivePage ----------------
+
+    /// <summary>
+    /// 由 MainWindow 在整窗全屏切换时调用。窗口呈现器不在这里动 —— 那是外壳的职责，
+    /// 页面只负责收起 / 恢复自己这一层（工具栏、标签、状态条、圆角与内边距）。
+    /// </summary>
+    public void SetImmersive(bool immersive)
+    {
+        if (immersive)
         {
-            ExitFullscreen();
+            OnFitToScreen(this, new RoutedEventArgs());
+            HideChrome();
         }
         else
         {
-            EnterFullscreen();
+            ShowChrome();
         }
-    }
-
-    private void EnterFullscreen()
-    {
-        if (_owner is null)
-        {
-            return;
-        }
-
-        _owner.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.FullScreen);
-        OnFitToScreen(this, new RoutedEventArgs());
-        HideChrome();
-    }
-
-    private void ExitFullscreen()
-    {
-        if (_owner is null)
-        {
-            return;
-        }
-
-        _owner.AppWindow.SetPresenter(Microsoft.UI.Windowing.AppWindowPresenterKind.Overlapped);
-        ShowChrome();
     }
 
     private void HideChrome()

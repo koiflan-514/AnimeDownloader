@@ -19,6 +19,21 @@ internal sealed class WindowsColorScheme
 {
     public static WindowsColorScheme Instance { get; } = new();
 
+    /// <summary>强调色实心块上的文字亮度阈值：高于它用近黑字，否则用白字。</summary>
+    private const double InkLuminanceThreshold = 0.4;
+
+    /// <summary>Dark 主题下强调色底衬的不透明度。</summary>
+    private const double DarkSoftOpacity = 0.16;
+
+    /// <summary>Light 主题下强调色底衬的不透明度（浅底上需要更克制）。</summary>
+    private const double LightSoftOpacity = 0.12;
+
+    /// <summary>Dark 主题下强调色描边的不透明度。</summary>
+    private const double DarkLineOpacity = 0.42;
+
+    /// <summary>Light 主题下强调色描边的不透明度。</summary>
+    private const double LightLineOpacity = 0.45;
+
     private readonly List<WeakReference<FrameworkElement>> _roots = [];
     private UISettings? _uiSettings;
     private DispatcherQueue? _dispatcherQueue;
@@ -44,6 +59,11 @@ internal sealed class WindowsColorScheme
 
         _roots.RemoveAll(weak => !weak.TryGetTarget(out _));
         _roots.Add(new WeakReference<FrameworkElement>(themeRoot));
+
+        // 注册即应用一次：XAML 里引用的 SystemAccentColor* 在强调色变更后不一定
+        // 会被框架即时重求值，而本窗口是在启动后才注册的 —— 不主动写一次，
+        // 首帧可能停在框架的旧值上（或者在有本地覆盖时停在 XAML 的默认值上）。
+        Apply();
     }
 
     /// <summary>读取系统当前配色并应用到全部已注册的主题根。</summary>
@@ -95,9 +115,26 @@ internal sealed class WindowsColorScheme
 
             // 2) 就地改写主题字典中的笔刷实例：应用自有界面即时变色，
             //    与普通画刷属性动画同路径，不触发框架主题重走（安全）。
-            //    Dark：主强调 = 系统原色；Light：主强调用 Dark1 变体保证浅色表面对比度。
-            ApplyToThemeDictionary(resources, "Dark", softColor: accent, strongAccent: accent);
-            ApplyToThemeDictionary(resources, "Light", softColor: accent, strongAccent: dark1);
+            //    Dark：主强调 = 系统原色，悬停取 Light1（更亮）。
+            //    Light：主强调取 Dark1（白底上要更深才站得住），悬停再深一档。
+            ApplyToThemeDictionary(
+                resources,
+                "Dark",
+                accent: accent,
+                accentStrong: light1,
+                lineColor: accent,
+                softColor: accent,
+                softOpacity: DarkSoftOpacity,
+                lineOpacity: DarkLineOpacity);
+            ApplyToThemeDictionary(
+                resources,
+                "Light",
+                accent: dark1,
+                accentStrong: dark2,
+                lineColor: dark1,
+                softColor: accent,
+                softOpacity: LightSoftOpacity,
+                lineOpacity: LightLineOpacity);
         }
         catch (Exception ex)
         {
@@ -109,34 +146,70 @@ internal sealed class WindowsColorScheme
         }
     }
 
+    /// <summary>
+    /// 把一套强调色写进某个主题字典里的全部 AppAccent* 笔刷。
+    /// 之所以逐个就地改写而不是让 XAML 靠 ThemeResource 自己重求值：WinUI 3 内建的
+    /// SystemAccentColor 在强调色变更后不保证即时刷新，而重设 RequestedTheme 强制
+    /// 重求值会在 XAML 原生层崩溃（见类型注释）。
+    /// </summary>
     private static void ApplyToThemeDictionary(
         ResourceDictionary resources,
         string themeKey,
+        Color accent,
+        Color accentStrong,
+        Color lineColor,
         Color softColor,
-        Color strongAccent)
+        double softOpacity,
+        double lineOpacity)
     {
-        const double darkSoftOpacity = 0.15;
-        const double lightSoftOpacity = 0.09;
         if (!resources.ThemeDictionaries.TryGetValue(themeKey, out var value) || value is not ResourceDictionary theme)
         {
             return;
         }
 
-        SetBrushColor(theme, "AppAccentBrush", strongAccent);
-        SetBrushColor(theme, "AppAccentBrush2", strongAccent);
-        SetBrushColor(theme, "AppAccentGradientBrush", strongAccent);
-        if (theme.TryGetValue("AppAccentSoftBrush", out var softValue) && softValue is SolidColorBrush soft)
-        {
-            soft.Color = softColor;
-            soft.Opacity = themeKey == "Dark" ? darkSoftOpacity : lightSoftOpacity;
-        }
+        SetBrush(theme, "AppAccentBrush", accent);
+        SetBrush(theme, "AppAccentStrongBrush", accentStrong);
+        SetBrush(theme, "AppFocusRingBrush", accent);
+        SetBrush(theme, "AppStatusBusyBrush", accent);
+        SetBrush(theme, "AppAccentSoftBrush", softColor, softOpacity);
+        SetBrush(theme, "AppAccentLineBrush", lineColor, lineOpacity);
+        // 压在实心强调块上的文字：按强调色自身的亮度取黑或白。
+        // 写死白色在 Windows 的浅色强调色（黄 / 薄荷 / 浅粉）上会直接糊掉。
+        SetBrush(theme, "AppAccentInkBrush", InkFor(accent));
     }
 
-    private static void SetBrushColor(ResourceDictionary theme, string key, Color color)
+    /// <summary>
+    /// 依据强调色的相对亮度挑选它上面的文字色。
+    /// 用 WCAG 的线性化公式而不是裸通道均值：绿色权重高，肉眼感受才对得上。
+    /// </summary>
+    private static Color InkFor(Color accent)
+    {
+        static double Linearize(byte channel)
+        {
+            var value = channel / 255.0;
+            return value <= 0.04045
+                ? value / 12.92
+                : Math.Pow((value + 0.055) / 1.055, 2.4);
+        }
+
+        var luminance = (0.2126 * Linearize(accent.R))
+            + (0.7152 * Linearize(accent.G))
+            + (0.0722 * Linearize(accent.B));
+
+        return luminance > InkLuminanceThreshold
+            ? Color.FromArgb(0xFF, 0x14, 0x15, 0x18)
+            : Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF);
+    }
+
+    private static void SetBrush(ResourceDictionary theme, string key, Color color, double? opacity = null)
     {
         if (theme.TryGetValue(key, out var value) && value is SolidColorBrush brush)
         {
             brush.Color = color;
+            if (opacity is { } target)
+            {
+                brush.Opacity = target;
+            }
         }
     }
 
