@@ -1,0 +1,185 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:AnimeDownloader.App.Controls"
+             x:Class="AnimeDownloader.App.Views.ViewerPage"
+             Focusable="True">
+
+    <!--
+        灯箱（Light Table）
+        ============================================================================
+        查看器不该是「一个带工具栏的页面」，而应该是一张被照亮的台面：
+        图片占据绝大部分面积，控件全部退化成浮在暗面上的玻璃。
+        顶部只留一行眉标与等宽元数据，底部一条页脚轨道 —— 上下的「边框」都压到最薄，
+        把垂直空间几乎全部让给图片本身。
+
+        —— 与 WinUI 版的三处结构性替换 ——
+        1. 根容器是 <c>Border</c> 而不是 <c>Grid</c>。UWP/WinUI 的 Grid 自己带 Padding，
+           Avalonia 的 Panel 没有；页级内边距（全屏时要归零的那一层）只能挂在 Border 上。
+        2. 台面 <c>ViewArea</c> 同理：边框与圆角要挂在 Border 上，里面再放一层 Grid 承载
+           五个互相覆盖的层（滚动区 / 进度环 / 错误面板 / 读数 / 浮动工具栏）。
+        3. <c>ScrollViewer.ZoomMode</c> 不存在，缩放改由代码直接算图片的显示尺寸
+           （见 ViewerPage.axaml.cs 的 ApplyImageLayout）—— 语义与 ChangeView(zoom) 等价，
+           而且滚动条行为由框架按最终尺寸自然给出。
+    -->
+    <Border x:Name="Root" Padding="0">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+            <!-- ============ 头部：极简，只有「这是哪一张」 ============ -->
+            <Grid x:Name="ToolbarHeader" Grid.Row="0" Margin="28,20,24,0"
+                  ColumnSpacing="16" ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="5">
+                    <TextBlock Text="灯箱" Theme="{StaticResource AppEyebrow}" />
+                    <TextBlock x:Name="MetaText" Theme="{StaticResource AppHintText}"
+                               TextWrapping="NoWrap" MaxWidth="560"
+                               TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2"
+                            VerticalAlignment="Bottom" Margin="0,0,0,1">
+                    <HyperlinkButton x:Name="SourceLinkButton" Content="打开来源"
+                                     Theme="{StaticResource AppLinkButton}"
+                                     IsVisible="False" Click="OnOpenSource" />
+                    <HyperlinkButton x:Name="SaucenaoButton" Content="SauceNAO 反搜"
+                                     Theme="{StaticResource AppLinkButton}"
+                                     IsVisible="False" Click="OnOpenSaucenao"
+                                     ToolTip.Tip="以图搜图：在 SauceNAO 查找这张图的来源" />
+                    <HyperlinkButton x:Name="IqdbButton" Content="IQDB 反搜"
+                                     Theme="{StaticResource AppLinkButton}"
+                                     IsVisible="False" Click="OnOpenIqdb"
+                                     ToolTip.Tip="以图搜图：在 IQDB 查找缩略图与更高清版本" />
+                    <Button x:Name="CopyLinkButton" Theme="{StaticResource AppIconButton}"
+                            IsVisible="False" Click="OnCopyImageLink"
+                            ToolTip.Tip="复制图片直链">
+                        <controls:FontIcon Glyph="&#xE8C8;" FontSize="13" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!-- ============ 标签条：夹在两道细线之间，点一下即切到该标签的画廊 ============ -->
+            <Border x:Name="TagsHost" Grid.Row="1"
+                    BorderBrush="{DynamicResource AppHairlineBrush}"
+                    BorderThickness="0,1,0,1"
+                    Margin="0,18,0,0" Padding="24,9"
+                    IsVisible="False">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="标签（点击浏览该标签下的图片）"
+                               Theme="{StaticResource AppGroupHeader}" />
+                    <!-- WinUI 用自写的 SimpleWrapPanel；Avalonia 内置的 WrapPanel 已经够用，
+                         项间距改由每个 chip 的 Margin 承担。 -->
+                    <WrapPanel x:Name="TagsList" Orientation="Horizontal" />
+                </StackPanel>
+            </Border>
+
+            <!-- ============ 灯箱台面 ============ -->
+            <Border x:Name="ViewArea" Grid.Row="2" Margin="20,16,20,14"
+                    Background="{DynamicResource AppViewerBackgroundBrush}"
+                    BorderBrush="{DynamicResource AppHairlineBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{DynamicResource PanelCornerRadius}"
+                    DoubleTapped="OnViewAreaDoubleTapped">
+                <Grid>
+                    <ScrollViewer x:Name="ViewScroller"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalContentAlignment="Center"
+                                  VerticalContentAlignment="Center">
+                        <Image x:Name="ViewImage" Stretch="Uniform" />
+                    </ScrollViewer>
+
+                    <controls:ProgressRing x:Name="LoadingRing"
+                                           Theme="{StaticResource AppProgressRing}"
+                                           Width="40" Height="40" IsActive="False" />
+
+                    <StackPanel x:Name="ErrorPanel" IsVisible="False"
+                                HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                        <controls:FontIcon Glyph="&#xE7BA;" FontSize="30"
+                                           Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                        <TextBlock x:Name="ErrorText" Text="加载失败"
+                                   Foreground="{DynamicResource AppTextPrimaryBrush}" />
+                        <Button x:Name="RetryButton" Content="重试" Click="OnRetry"
+                                Theme="{StaticResource AppPillButton}" />
+                    </StackPanel>
+
+                    <!-- 图片信息（左下）：等宽读数，深色玻璃底 -->
+                    <StackPanel x:Name="InfoChips" Orientation="Horizontal" Spacing="6"
+                                HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                                Margin="14,0,0,14" IsVisible="False">
+                        <Border x:Name="ArtistChip" Theme="{StaticResource AppGlassChip}">
+                            <TextBlock x:Name="ArtistText"
+                                       FontFamily="{DynamicResource AppFontMono}" FontSize="10.5"
+                                       LetterSpacing="0.53" Foreground="#FFEDEFF2" />
+                        </Border>
+                        <Border x:Name="ResChip" Theme="{StaticResource AppGlassChip}"
+                                IsVisible="False">
+                            <TextBlock x:Name="ResText"
+                                       FontFamily="{DynamicResource AppFontMono}" FontSize="10.5"
+                                       LetterSpacing="0.32" Foreground="#FFEDEFF2" />
+                        </Border>
+                    </StackPanel>
+
+                    <!-- 浮动工具栏：底部居中的一片玻璃，圆角取满，像一块压在照片上的镇纸 -->
+                    <Border x:Name="FloatingToolbar" Theme="{StaticResource AppFloatingToolbar}"
+                            CornerRadius="999" Padding="7,6"
+                            HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                            Margin="0,0,0,14">
+                        <StackPanel Orientation="Horizontal" Spacing="1">
+                            <Button x:Name="RefreshButton" Theme="{StaticResource AppIconButton}"
+                                    Click="OnRefresh" ToolTip.Tip="换一张（空格）">
+                                <controls:FontIcon Glyph="&#xE72C;" FontSize="14" />
+                            </Button>
+                            <Button x:Name="SaveButton" Theme="{StaticResource AppIconButton}"
+                                    Click="OnSave" ToolTip.Tip="保存（Ctrl+S）">
+                                <controls:FontIcon Glyph="&#xE74E;" FontSize="14" />
+                            </Button>
+                            <Border Width="1" Height="18" Margin="7,0" VerticalAlignment="Center"
+                                    Background="{DynamicResource AppHairlineStrongBrush}" />
+                            <Button x:Name="ZoomOutButton" Theme="{StaticResource AppIconButton}"
+                                    Click="OnZoomOut" ToolTip.Tip="缩小（Ctrl+-）">
+                                <controls:FontIcon Glyph="&#xE8A2;" FontSize="14" />
+                            </Button>
+                            <Border MinWidth="50" Padding="4,0" VerticalAlignment="Center">
+                                <TextBlock x:Name="ZoomLabel" Text="100%"
+                                           Theme="{StaticResource AppMonoStrong}"
+                                           HorizontalAlignment="Center" />
+                            </Border>
+                            <Button x:Name="ZoomInButton" Theme="{StaticResource AppIconButton}"
+                                    Click="OnZoomIn" ToolTip.Tip="放大（Ctrl++）">
+                                <controls:FontIcon Glyph="&#xE8A3;" FontSize="14" />
+                            </Button>
+                            <Border Width="1" Height="18" Margin="7,0" VerticalAlignment="Center"
+                                    Background="{DynamicResource AppHairlineStrongBrush}" />
+                            <Button x:Name="FitButton" Theme="{StaticResource AppIconButton}"
+                                    Click="OnFitToScreen" ToolTip.Tip="适应屏幕（Ctrl+0）">
+                                <controls:FontIcon Glyph="&#xE7C3;" FontSize="14" />
+                            </Button>
+                            <Button x:Name="ActualSizeButton" Theme="{StaticResource AppIconButton}"
+                                    Click="OnActualSize" ToolTip.Tip="实际大小">
+                                <controls:FontIcon Glyph="&#xE738;" FontSize="14" />
+                            </Button>
+                            <Button x:Name="StretchButton" Theme="{StaticResource AppIconButton}"
+                                    Click="OnStretchFill" ToolTip.Tip="拉伸填充">
+                                <controls:FontIcon Glyph="&#xE78F;" FontSize="14" />
+                            </Button>
+                            <Border Width="1" Height="18" Margin="7,0" VerticalAlignment="Center"
+                                    Background="{DynamicResource AppHairlineStrongBrush}" />
+                            <Button x:Name="FullscreenButton" Theme="{StaticResource AppIconButton}"
+                                    Click="OnToggleFullscreen" ToolTip.Tip="全屏（F11）">
+                                <controls:FontIcon Glyph="&#xE740;" FontSize="14" />
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- ============ 页脚轨道 ============ -->
+            <Border x:Name="StatusBar" Grid.Row="3" Theme="{StaticResource AppStatusBar}"
+                    Height="42" Padding="24,0,24,0">
+                <Grid ColumnSpacing="9" ColumnDefinitions="Auto,*">
+                    <Ellipse x:Name="StatusDot" Theme="{StaticResource AppStatusDot}"
+                             VerticalAlignment="Center" />
+                    <TextBlock x:Name="StatusText" Grid.Column="1" Text="就绪"
+                               Theme="{StaticResource AppCaptionText}" />
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>

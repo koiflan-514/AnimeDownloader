@@ -1,0 +1,189 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        ============================================================================
+        Fluent 基线覆盖层
+        ============================================================================
+        只做一件事：把 Avalonia Fluent 主题的中性灰阶收进暗房的炭灰阶梯。
+        **强调色一律不碰** —— 与 WinUI 版同一条理由：Avalonia 的 AccentFillColor*/
+        HyperlinkButtonForeground/TextControlBorderBrushFocused 本来就派生自
+        SystemAccentColor*，也就是 AppAccent* 引用的同一个源，所以原生控件的
+        强调色天然一致，这里多写一行反而会割裂。
+
+        键名说明：WinUI 与 Avalonia 的 Fluent 资源名并不通用（Avalonia 用的是
+        SystemControl* / TextControl* 这一套 UWP 时代命名）。全部键名都经过运行时
+        TryFindResource 实测确认存在，未确认的一律不写 —— 写错的键不会报错，
+        只会静默不生效，那比不写更危险。
+
+        「不生效」的排查手段：在应用里临时把一个 TextBox 的背景换成
+        {DynamicResource <键名>}，看是否变色。静态看不出来，只有渲染才能证明。
+        ============================================================================
+    -->
+
+    <!-- 全局字体：正文/控件统一走 Segoe UI Variable Text，覆盖 Avalonia 默认的 Inter -->
+    <FontFamily x:Key="ContentControlThemeFontFamily">Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI</FontFamily>
+
+    <ResourceDictionary.ThemeDictionaries>
+
+        <!-- ==================== Dark（默认） ==================== -->
+        <ResourceDictionary x:Key="Dark">
+
+            <!-- 表面色阶：房间 → 相纸 → 抬升 → 下沉 -->
+            <SolidColorBrush x:Key="SystemControlPageBackgroundChromeLowBrush" Color="#FF0D0E11" />
+            <SolidColorBrush x:Key="SystemControlPageBackgroundChromeMediumLowBrush" Color="#FF14161A" />
+            <SolidColorBrush x:Key="SystemControlBackgroundAltHighBrush" Color="#FF14161A" />
+            <SolidColorBrush x:Key="SystemControlBackgroundAltMediumBrush" Color="#FF1B1E24" />
+            <SolidColorBrush x:Key="SystemControlBackgroundChromeMediumBrush" Color="#FF1B1E24" />
+            <SolidColorBrush x:Key="SystemControlBackgroundChromeMediumLowBrush" Color="#FF14161A" />
+            <SolidColorBrush x:Key="SystemControlBackgroundBaseLowBrush" Color="#14FFFFFF" />
+            <SolidColorBrush x:Key="SystemControlBackgroundBaseMediumBrush" Color="#1AFFFFFF" />
+
+            <!-- 文本四级 -->
+            <SolidColorBrush x:Key="SystemControlForegroundBaseHighBrush" Color="#FFEDEEF1" />
+            <SolidColorBrush x:Key="SystemControlForegroundBaseMediumBrush" Color="#FF9AA0AB" />
+            <SolidColorBrush x:Key="SystemControlForegroundBaseLowBrush" Color="#FF6B7179" />
+
+            <!-- 默认按钮 -->
+            <SolidColorBrush x:Key="ButtonBackground" Color="#FF1B1E24" />
+            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#FF20242B" />
+            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#FF14161A" />
+            <SolidColorBrush x:Key="ButtonForeground" Color="#FFEDEEF1" />
+            <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#FFEDEEF1" />
+            <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#FFEDEEF1" />
+            <SolidColorBrush x:Key="ButtonBorderBrush" Color="#26FFFFFF" />
+
+            <SolidColorBrush x:Key="ToggleButtonBackground" Color="#FF1B1E24" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundPointerOver" Color="#FF20242B" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundPressed" Color="#FF14161A" />
+            <SolidColorBrush x:Key="ToggleButtonForeground" Color="#FFEDEEF1" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrush" Color="#26FFFFFF" />
+
+            <!-- 输入框（焦点下划线留给框架的强调色） -->
+            <SolidColorBrush x:Key="TextControlBackground" Color="#FF07080A" />
+            <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#FF07080A" />
+            <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FF07080A" />
+            <SolidColorBrush x:Key="TextControlBorderBrush" Color="#26FFFFFF" />
+            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#3DFFFFFF" />
+            <SolidColorBrush x:Key="TextControlForeground" Color="#FFEDEEF1" />
+            <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#FFEDEEF1" />
+            <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#FFEDEEF1" />
+            <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#FF6B7179" />
+            <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#FF474C55" />
+
+            <!-- 下拉 -->
+            <SolidColorBrush x:Key="ComboBoxBackground" Color="#FF1B1E24" />
+            <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#FF20242B" />
+            <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#FF14161A" />
+            <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#26FFFFFF" />
+            <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#3DFFFFFF" />
+            <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#FF14161A" />
+            <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#26FFFFFF" />
+            <SolidColorBrush x:Key="ComboBoxForeground" Color="#FFEDEEF1" />
+            <SolidColorBrush x:Key="ComboBoxForegroundFocused" Color="#FFEDEEF1" />
+            <SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver" Color="#0FFFFFFF" />
+            <SolidColorBrush x:Key="ComboBoxItemForeground" Color="#FFEDEEF1" />
+            <SolidColorBrush x:Key="ComboBoxItemBackgroundSelected" Color="#0FFFFFFF" />
+            <SolidColorBrush x:Key="ComboBoxItemForegroundSelected" Color="#FFEDEEF1" />
+
+            <!-- 浮层 / 提示 / 菜单 -->
+            <SolidColorBrush x:Key="FlyoutPresenterBackground" Color="#FF14161A" />
+            <SolidColorBrush x:Key="FlyoutBorderThemeBrush" Color="#26FFFFFF" />
+            <SolidColorBrush x:Key="FlyoutPresenterBorderBrush" Color="#26FFFFFF" />
+            <SolidColorBrush x:Key="FlyoutContentBackground" Color="Transparent" />
+            <SolidColorBrush x:Key="ToolTipBackground" Color="#FF1B1E24" />
+            <SolidColorBrush x:Key="ToolTipBorderBrush" Color="#26FFFFFF" />
+            <SolidColorBrush x:Key="ToolTipForeground" Color="#FFEDEEF1" />
+            <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#FF14161A" />
+            <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver" Color="#0FFFFFFF" />
+            <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed" Color="#1AFFFFFF" />
+            <SolidColorBrush x:Key="MenuFlyoutItemForeground" Color="#FFEDEEF1" />
+            <SolidColorBrush x:Key="MenuFlyoutSeparatorBackground" Color="#14FFFFFF" />
+
+            <!-- 滚动条：退到几乎不可见，只在需要时浮现 -->
+            <SolidColorBrush x:Key="ScrollBarThumbFill" Color="#33FFFFFF" />
+            <SolidColorBrush x:Key="ScrollBarThumbFillPointerOver" Color="#59FFFFFF" />
+            <SolidColorBrush x:Key="ScrollBarThumbFillPressed" Color="#73FFFFFF" />
+            <SolidColorBrush x:Key="ScrollBarTrackFill" Color="Transparent" />
+            <SolidColorBrush x:Key="ScrollBarBackground" Color="Transparent" />
+            <SolidColorBrush x:Key="ScrollBarPanningThumbBackground" Color="#33FFFFFF" />
+        </ResourceDictionary>
+
+        <!-- ==================== Light ==================== -->
+        <ResourceDictionary x:Key="Light">
+
+            <SolidColorBrush x:Key="SystemControlPageBackgroundChromeLowBrush" Color="#FFF7F7F9" />
+            <SolidColorBrush x:Key="SystemControlPageBackgroundChromeMediumLowBrush" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="SystemControlBackgroundAltHighBrush" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="SystemControlBackgroundAltMediumBrush" Color="#FFFBFBFD" />
+            <SolidColorBrush x:Key="SystemControlBackgroundChromeMediumBrush" Color="#FFFBFBFD" />
+            <SolidColorBrush x:Key="SystemControlBackgroundChromeMediumLowBrush" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="SystemControlBackgroundBaseLowBrush" Color="#12000000" />
+            <SolidColorBrush x:Key="SystemControlBackgroundBaseMediumBrush" Color="#14000000" />
+
+            <SolidColorBrush x:Key="SystemControlForegroundBaseHighBrush" Color="#FF15161A" />
+            <SolidColorBrush x:Key="SystemControlForegroundBaseMediumBrush" Color="#FF5A606A" />
+            <SolidColorBrush x:Key="SystemControlForegroundBaseLowBrush" Color="#FF878D96" />
+
+            <SolidColorBrush x:Key="ButtonBackground" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#FFF7F7F9" />
+            <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#FFF0F0F3" />
+            <SolidColorBrush x:Key="ButtonForeground" Color="#FF15161A" />
+            <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#FF15161A" />
+            <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#FF15161A" />
+            <SolidColorBrush x:Key="ButtonBorderBrush" Color="#21000000" />
+
+            <SolidColorBrush x:Key="ToggleButtonBackground" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundPointerOver" Color="#FFF7F7F9" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundPressed" Color="#FFF0F0F3" />
+            <SolidColorBrush x:Key="ToggleButtonForeground" Color="#FF15161A" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrush" Color="#21000000" />
+
+            <SolidColorBrush x:Key="TextControlBackground" Color="#FFEBEBEF" />
+            <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#FFEBEBEF" />
+            <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="TextControlBorderBrush" Color="#21000000" />
+            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#33000000" />
+            <SolidColorBrush x:Key="TextControlForeground" Color="#FF15161A" />
+            <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#FF15161A" />
+            <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#FF15161A" />
+            <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#FF878D96" />
+            <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#FFB3B7BE" />
+
+            <SolidColorBrush x:Key="ComboBoxBackground" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#FFF7F7F9" />
+            <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#FFF0F0F3" />
+            <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#21000000" />
+            <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#33000000" />
+            <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#21000000" />
+            <SolidColorBrush x:Key="ComboBoxForeground" Color="#FF15161A" />
+            <SolidColorBrush x:Key="ComboBoxForegroundFocused" Color="#FF15161A" />
+            <SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver" Color="#0A000000" />
+            <SolidColorBrush x:Key="ComboBoxItemForeground" Color="#FF15161A" />
+            <SolidColorBrush x:Key="ComboBoxItemBackgroundSelected" Color="#0A000000" />
+            <SolidColorBrush x:Key="ComboBoxItemForegroundSelected" Color="#FF15161A" />
+
+            <SolidColorBrush x:Key="FlyoutPresenterBackground" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="FlyoutBorderThemeBrush" Color="#21000000" />
+            <SolidColorBrush x:Key="FlyoutPresenterBorderBrush" Color="#21000000" />
+            <SolidColorBrush x:Key="FlyoutContentBackground" Color="Transparent" />
+            <SolidColorBrush x:Key="ToolTipBackground" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="ToolTipBorderBrush" Color="#21000000" />
+            <SolidColorBrush x:Key="ToolTipForeground" Color="#FF15161A" />
+            <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPointerOver" Color="#0A000000" />
+            <SolidColorBrush x:Key="MenuFlyoutItemBackgroundPressed" Color="#14000000" />
+            <SolidColorBrush x:Key="MenuFlyoutItemForeground" Color="#FF15161A" />
+            <SolidColorBrush x:Key="MenuFlyoutSeparatorBackground" Color="#12000000" />
+
+            <SolidColorBrush x:Key="ScrollBarThumbFill" Color="#33000000" />
+            <SolidColorBrush x:Key="ScrollBarThumbFillPointerOver" Color="#59000000" />
+            <SolidColorBrush x:Key="ScrollBarThumbFillPressed" Color="#73000000" />
+            <SolidColorBrush x:Key="ScrollBarTrackFill" Color="Transparent" />
+            <SolidColorBrush x:Key="ScrollBarBackground" Color="Transparent" />
+            <SolidColorBrush x:Key="ScrollBarPanningThumbBackground" Color="#33000000" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+
+</ResourceDictionary>

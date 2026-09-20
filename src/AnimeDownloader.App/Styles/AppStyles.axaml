@@ -1,0 +1,871 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:controls="clr-namespace:AnimeDownloader.App.Controls">
+
+    <!--
+        ============================================================================
+        暗房 (Darkroom) — 排版、表面、状态与交互控件
+        ============================================================================
+        三条铁律（与 WinUI 版一致）：
+            1. 不用阴影表达层级，只用「表面色阶 + 1px 极细线」。
+            2. 数字、页码、分辨率、版本、快捷键一律等宽 (Cascadia Mono)。
+            3. 卡片默认无描边无背景差，靠间距成组；只有需要托住内容时才上「相纸」。
+
+        —— 为什么排版与控件主题合在一本字典里 ——
+        WinUI 版分成 AppStyles.xaml + FluentTheme.xaml 两条 MergedDictionary。搬到这里
+        之后**不能照抄那个切法**：WinUI 的 MergedDictionaries 有「同名键以后者为准」的
+        resource 查找语义，而 Avalonia 的资源字典是各自独立解析的 —— 一个字典里的
+        StaticResource 只能看见「自己 + 自己显式 merge 进来的」键，
+        看不见「排在它前面的兄弟字典」。于是「控件主题引用排版主题」这条边
+        （InfoBar 的模板要 AppSettingsTitle / AppSettingsDesc、ConfirmDialog 要 AppDialogPanel）
+        在跨文件时会在加载期解析不到。
+        合成一本之后所有 StaticResource 都落在同一作用域内，确定性最高。
+        纯数据的两层（设计令牌、Fluent 覆盖）仍然是独立文件 —— 它们不引用任何兄弟字典。
+
+        —— Avalonia 移植要点 ——
+          · WinUI 的 VisualStateManager 换成「选择器 + 伪类」，并且状态样式必须写在
+            ControlTheme 内部用 `^` 选择器 —— 写在 ControlTheme 外面用 `/template/`
+            去够模板子元素，会被模板自己的绑定压住而静默失效（本轮实测）。
+          · WinUI 的 CharacterSpacing（1/1000 em）换算成 Avalonia 的 LetterSpacing（像素）：
+            px = FontSize × CharacterSpacing / 1000，逐条写在注释里。
+          · 一律 DynamicResource 引用 Token，不用 StaticResource —— 换亮暗主题要立刻跟着变，
+            StaticResource 会在首次解析后就钉死。
+          · 赋值控件主题用 Theme="..." 而不是 Style="..."：Avalonia 11 起
+            ControlTheme 走 Theme 属性，Style 是给「选择器式样式」用的。
+        ============================================================================
+    -->
+
+    <!--
+        注意：这里**刻意不** merge Tokens.axaml。
+        merge 进来会得到第二份令牌实例（笔刷是引用类型），于是
+        「WindowsColorScheme 就地改写应用级那份笔刷」与「控件 Theme 里解析到的那份」
+        可能不是同一个对象 —— 强调色就只更新一半，而且两半看起来都正常。
+        本字典对令牌的引用一律走 DynamicResource（运行时沿控件所在的可视树向上找，
+        最终落到 Application.Resources 里唯一那份 Tokens），所以根本不需要 merge。
+        同理不用 StaticResource 引用令牌：那会在解析期把值抄成快照，
+        主题一换就有一半不跟着走。
+    -->
+
+    <!-- ==================== 文本样式 ==================== -->
+
+    <!-- 展板大标题：画廊首屏 -->
+    <ControlTheme x:Key="AppDisplayText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontDisplay}" />
+        <Setter Property="FontSize" Value="32" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="LetterSpacing" Value="-0.8" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </ControlTheme>
+
+    <!-- 页面标题（查看器 / 设置） -->
+    <ControlTheme x:Key="AppSectionTitle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontDisplay}" />
+        <Setter Property="FontSize" Value="26" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="LetterSpacing" Value="-0.47" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </ControlTheme>
+
+    <!-- 眉标：标题上方那行小字，等宽 + 宽字距，编辑部气质 -->
+    <ControlTheme x:Key="AppEyebrow" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontMono}" />
+        <Setter Property="FontSize" Value="10.5" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="LetterSpacing" Value="0.95" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextTertiaryBrush}" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+    </ControlTheme>
+
+    <!-- 说明 / 副标题 -->
+    <ControlTheme x:Key="AppHintText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontText}" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextSecondaryBrush}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </ControlTheme>
+
+    <!-- 正文 -->
+    <ControlTheme x:Key="AppBodyText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontText}" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextSecondaryBrush}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="LineHeight" Value="20" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </ControlTheme>
+
+    <!-- 元数据 / 页脚 / 状态：等宽。本设计最容易被记住的一处细节 -->
+    <ControlTheme x:Key="AppCaptionText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontMono}" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextTertiaryBrush}" />
+        <Setter Property="FontSize" Value="11.5" />
+        <Setter Property="LetterSpacing" Value="0.12" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </ControlTheme>
+
+    <!-- 等宽强调（页码、计数、缩放百分比） -->
+    <ControlTheme x:Key="AppMonoStrong" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontMono}" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="LetterSpacing" Value="0.24" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </ControlTheme>
+
+    <ControlTheme x:Key="AppCardTitleText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontText}" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </ControlTheme>
+
+    <!-- 表单字段标签 -->
+    <ControlTheme x:Key="AppLabel" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontText}" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextSecondaryBrush}" />
+        <Setter Property="FontSize" Value="11.5" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="LetterSpacing" Value="0.23" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </ControlTheme>
+
+    <!-- 分组眉标（设置页 / 浮层小标题） -->
+    <ControlTheme x:Key="AppGroupHeader" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontMono}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="LetterSpacing" Value="0.88" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextTertiaryBrush}" />
+        <Setter Property="Margin" Value="0,0,0,2" />
+    </ControlTheme>
+
+    <ControlTheme x:Key="AppSettingsTitle" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontText}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </ControlTheme>
+
+    <ControlTheme x:Key="AppSettingsDesc" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontText}" />
+        <Setter Property="FontSize" Value="11.5" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextTertiaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </ControlTheme>
+
+    <!-- 设置页参数行上的字段名（设置页图源标签用的 BodyStrong 对应物） -->
+    <ControlTheme x:Key="AppBodyStrong" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontText}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+    </ControlTheme>
+
+    <!-- 标签 chip 里的等宽小字 -->
+    <ControlTheme x:Key="AppTagChipText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontMono}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </ControlTheme>
+
+    <!-- 空状态图形 -->
+    <ControlTheme x:Key="AppEmptyGlyph" TargetType="controls:FontIcon">
+        <Setter Property="FontSize" Value="28" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextQuaternaryBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+    </ControlTheme>
+
+    <!-- ==================== 表面 ==================== -->
+
+    <!-- 相纸：托住内容的最小单位。默认无描边，只用表面色阶 -->
+    <ControlTheme x:Key="AppCardBorder" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource AppCardFillBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppHairlineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource CardCornerRadius}" />
+        <Setter Property="Padding" Value="0" />
+    </ControlTheme>
+
+    <ControlTheme x:Key="AppPanelBorder" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource AppPanelFillBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppHairlineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource PanelCornerRadius}" />
+    </ControlTheme>
+
+    <!-- 下沉面：输入框、查看器底衬 -->
+    <ControlTheme x:Key="AppSunkenBorder" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource AppSurfaceSunkenBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppHairlineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
+    </ControlTheme>
+
+    <!--
+        页脚轨道：不再是一个「盒子」，而是一条带顶部分隔线的裸轨道。
+        这是把状态栏从「卡片堆」拉回「编辑部排版」的关键一步。
+    -->
+    <ControlTheme x:Key="AppStatusBar" TargetType="Border">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppHairlineBrush}" />
+        <Setter Property="BorderThickness" Value="0,1,0,0" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="Padding" Value="0" />
+    </ControlTheme>
+
+    <!-- 浮动工具栏（查看器 / 大图窗口）：玻璃 + 内描边模拟折射边缘 -->
+    <ControlTheme x:Key="AppFloatingToolbar" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource AppToolbarFillBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppHairlineStrongBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource PanelCornerRadius}" />
+        <Setter Property="Padding" Value="6,5" />
+    </ControlTheme>
+
+    <!--
+        「设置卡片」在本设计里不再是一张卡片，而是参数表里的一行：
+        透明底 + 底部 1px 极细线。分组靠留白与眉标，不靠盒子。
+    -->
+    <ControlTheme x:Key="AppSettingsCard" TargetType="Border">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppHairlineBrush}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="CornerRadius" Value="0" />
+        <Setter Property="Padding" Value="0" />
+    </ControlTheme>
+
+    <!-- 描边胶囊标签：编辑部标签的写法，等宽小字 -->
+    <ControlTheme x:Key="AppChipBorder" TargetType="Border">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppHairlineStrongBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource PillCornerRadius}" />
+        <Setter Property="Padding" Value="9,3" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </ControlTheme>
+
+    <!-- 深色玻璃读数片：分辨率 / 作者（压在图片上的「仪表读数」） -->
+    <ControlTheme x:Key="AppGlassChip" TargetType="Border">
+        <Setter Property="CornerRadius" Value="5" />
+        <Setter Property="Background" Value="#B3070809" />
+        <Setter Property="Padding" Value="8,3" />
+    </ControlTheme>
+
+    <!-- 对话框面板 -->
+    <ControlTheme x:Key="AppDialogPanel" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource AppDialogFillBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppDialogStrokeBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource PanelCornerRadius}" />
+        <Setter Property="Padding" Value="24,22" />
+        <Setter Property="MinWidth" Value="320" />
+        <Setter Property="MaxWidth" Value="460" />
+    </ControlTheme>
+
+    <!-- ==================== 状态点 ==================== -->
+    <!--
+        状态语义只有三档，而不是五颜六色：
+        安静（灰，无光源）/ 工作（强调色，安全灯亮起）/ 故障（红）。
+        代码通过 Classes.Set("busy"|"error", bool) 切换，不再去 Resource 里取 Style。
+    -->
+    <ControlTheme x:Key="AppStatusDot" TargetType="Ellipse">
+        <Setter Property="Width" Value="6" />
+        <Setter Property="Height" Value="6" />
+        <Setter Property="Fill" Value="{DynamicResource AppStatusIdleBrush}" />
+        <Style Selector="^:busy">
+            <Setter Property="Fill" Value="{DynamicResource AppStatusBusyBrush}" />
+        </Style>
+        <Style Selector="^:error">
+            <Setter Property="Fill" Value="{DynamicResource AppStatusErrorBrush}" />
+        </Style>
+    </ControlTheme>
+
+    <!-- 设置页参数行：列间距 -->
+    <ControlTheme x:Key="AppSettingsRow" TargetType="Grid">
+        <Setter Property="ColumnSpacing" Value="20" />
+    </ControlTheme>
+
+    <!-- ==================== 按钮 ==================== -->
+
+    <!--
+        主操作：强调色实心。整页最多出现一次 —— 安全灯只为一件事亮起。
+        文字色用 AppAccentInkBrush（按强调色亮度取黑或白），焦点环也用 ink：
+        环画在实心块上，若同样取强调色就会自己吃掉自己。
+    -->
+    <ControlTheme x:Key="AppAccentButton" TargetType="Button">
+        <Setter Property="Background" Value="{DynamicResource AppAccentBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AppAccentInkBrush}" />
+        <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
+        <Setter Property="Padding" Value="16,7" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="34" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontText}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <ControlTemplate TargetType="Button">
+                <Grid Name="RootGrid" Background="Transparent">
+                    <Border Name="Fill" Background="{TemplateBinding Background}"
+                            CornerRadius="{TemplateBinding CornerRadius}" />
+                    <!-- 顶部 1px 高光：让实心块像被灯照到的实体，而不是平面色块 -->
+                    <Border Name="TopGloss" Height="1" VerticalAlignment="Top"
+                            Margin="1,0,1,0" Opacity="0.35" CornerRadius="1"
+                            Background="#FFFFFFFF" />
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      Margin="{TemplateBinding Padding}"
+                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                      Foreground="{TemplateBinding Foreground}"
+                                      FontSize="{TemplateBinding FontSize}"
+                                      FontWeight="{TemplateBinding FontWeight}"
+                                      FontFamily="{TemplateBinding FontFamily}"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}" />
+                    <Border Name="FocusRing" CornerRadius="{TemplateBinding CornerRadius}"
+                            BorderThickness="2" Opacity="0"
+                            BorderBrush="{DynamicResource AppAccentInkBrush}"
+                            IsHitTestVisible="False" />
+                </Grid>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#Fill">
+            <Setter Property="Background" Value="{DynamicResource AppAccentStrongBrush}" />
+        </Style>
+        <!-- 按压反馈用「填充变暗」而不是缩放：样式 Setter 无法表达 scale()，那是 CSS 而非 XAML。 -->
+        <Style Selector="^:pressed /template/ Border#Fill">
+            <Setter Property="Opacity" Value="0.86" />
+        </Style>
+        <Style Selector="^:pressed /template/ Border#TopGloss">
+            <Setter Property="Opacity" Value="0" />
+        </Style>
+        <Style Selector="^:disabled /template/ Grid#RootGrid">
+            <Setter Property="Opacity" Value="0.32" />
+        </Style>
+        <Style Selector="^:focus /template/ Border#FocusRing">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+    </ControlTheme>
+
+    <!-- 兼容别名：旧页面引用的 AccentButtonStyle -->
+    <ControlTheme x:Key="AccentButtonStyle" TargetType="Button" BasedOn="{StaticResource AppAccentButton}" />
+
+    <!-- 次操作：细线描边，静默 -->
+    <ControlTheme x:Key="AppPillButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+        <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
+        <Setter Property="Padding" Value="13,6" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontText}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppHairlineStrongBrush}" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <ControlTemplate TargetType="Button">
+                <Grid Name="RootGrid" Background="Transparent">
+                    <Border Name="Fill" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}" />
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      Margin="{TemplateBinding Padding}"
+                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                      Foreground="{TemplateBinding Foreground}"
+                                      FontSize="{TemplateBinding FontSize}"
+                                      FontWeight="{TemplateBinding FontWeight}"
+                                      FontFamily="{TemplateBinding FontFamily}"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}" />
+                    <Border Name="FocusRing" CornerRadius="{TemplateBinding CornerRadius}"
+                            BorderThickness="2" Opacity="0"
+                            BorderBrush="{DynamicResource AppFocusRingBrush}"
+                            IsHitTestVisible="False" />
+                </Grid>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#Fill">
+            <Setter Property="Background" Value="{DynamicResource AppCardFillHoverBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppHairlineStrongBrush}" />
+        </Style>
+        <Style Selector="^:pressed /template/ Border#Fill">
+            <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppAccentLineBrush}" />
+            <Setter Property="Opacity" Value="0.86" />
+        </Style>
+        <Style Selector="^:disabled /template/ Grid#RootGrid">
+            <Setter Property="Opacity" Value="0.36" />
+        </Style>
+        <Style Selector="^:focus /template/ Border#FocusRing">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+    </ControlTheme>
+
+    <!-- 图标按钮：32×32，悬停只加一层极淡的填充，不发光 -->
+    <ControlTheme x:Key="AppIconButton" TargetType="Button">
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextSecondaryBrush}" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <ControlTemplate TargetType="Button">
+                <Grid Name="RootGrid" Background="Transparent">
+                    <Border Name="RootBorder"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            BorderThickness="0" />
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      Foreground="{TemplateBinding Foreground}"
+                                      FontSize="{TemplateBinding FontSize}"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}" />
+                    <Border Name="FocusRing" CornerRadius="{TemplateBinding CornerRadius}"
+                            BorderThickness="2" Opacity="0"
+                            BorderBrush="{DynamicResource AppFocusRingBrush}"
+                            IsHitTestVisible="False" />
+                </Grid>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#RootBorder">
+            <Setter Property="Background" Value="{DynamicResource AppSubtleHoverBrush}" />
+        </Style>
+        <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+        </Style>
+        <Style Selector="^:pressed /template/ Border#RootBorder">
+            <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}" />
+            <Setter Property="Opacity" Value="0.85" />
+        </Style>
+        <Style Selector="^:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+        </Style>
+        <Style Selector="^:disabled /template/ Grid#RootGrid">
+            <Setter Property="Opacity" Value="0.32" />
+        </Style>
+        <Style Selector="^:focus /template/ Border#FocusRing">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+    </ControlTheme>
+
+    <!-- 悬浮在图片上的图标按钮：始终是深色玻璃 + 白图标 -->
+    <ControlTheme x:Key="AppOverlayIconButton" TargetType="Button" BasedOn="{StaticResource AppIconButton}">
+        <Setter Property="Background" Value="#B30B0C0F" />
+        <Setter Property="Foreground" Value="#FFF2F3F5" />
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="CornerRadius" Value="6" />
+    </ControlTheme>
+
+    <ControlTheme x:Key="AppSmallIconButton" TargetType="Button" BasedOn="{StaticResource AppIconButton}">
+        <Setter Property="Width" Value="26" />
+        <Setter Property="Height" Value="26" />
+        <Setter Property="FontSize" Value="12" />
+    </ControlTheme>
+
+    <!-- 描边胶囊标签（查看器的标签 chip）：等宽小字；悬停整枚转强调色 -->
+    <ControlTheme x:Key="AppTagChipButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextSecondaryBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppHairlineStrongBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource PillCornerRadius}" />
+        <Setter Property="Padding" Value="9,3" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontMono}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <ControlTemplate TargetType="Button">
+                <Grid Name="RootGrid" Background="Transparent">
+                    <Border Name="Fill" Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}" />
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      Margin="{TemplateBinding Padding}"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      Foreground="{TemplateBinding Foreground}"
+                                      FontSize="{TemplateBinding FontSize}"
+                                      FontFamily="{TemplateBinding FontFamily}"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}" />
+                    <Border Name="FocusRing" CornerRadius="{TemplateBinding CornerRadius}"
+                            BorderThickness="2" Opacity="0"
+                            BorderBrush="{DynamicResource AppFocusRingBrush}"
+                            IsHitTestVisible="False" />
+                </Grid>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#Fill">
+            <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppAccentLineBrush}" />
+        </Style>
+        <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+        </Style>
+        <Style Selector="^:pressed /template/ Border#Fill">
+            <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}" />
+            <Setter Property="Opacity" Value="0.86" />
+        </Style>
+        <Style Selector="^:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+        </Style>
+        <Style Selector="^:disabled /template/ Grid#RootGrid">
+            <Setter Property="Opacity" Value="0.36" />
+        </Style>
+        <Style Selector="^:focus /template/ Border#FocusRing">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+    </ControlTheme>
+
+    <!--
+        链接按钮。沿用 Avalonia Fluent 自带 HyperlinkButton 的观感（强调色 + 悬停下划线），
+        只把字号收到设计规范的值。**不重写模板** —— Fluent 的 HyperlinkButton 已经
+        从 AccentFillColor* 派生前景色，与 AppAccent* 同源。
+    -->
+    <ControlTheme x:Key="AppLinkButton" TargetType="HyperlinkButton">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontText}" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="Padding" Value="6,3" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+    </ControlTheme>
+
+    <!-- ==================== 分段器 ==================== -->
+
+    <!--
+        细线分段器：容器透明 + 1px 极细线；选中项用强调色底衬，不用实心强调块，
+        这样「当前选项」是暖的，但不会在界面里砸出一个洞。
+        选中色与悬停反馈**分层**：CheckBorder 只受 :checked 控制，
+        HoverLayer 只受 :pointerover 控制，避免两组状态争抢同一属性。
+    -->
+    <ControlTheme x:Key="AppSegmentRadio" TargetType="RadioButton">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextSecondaryBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="11,5" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontText}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <ControlTemplate TargetType="RadioButton">
+                <Grid Name="RootGrid" Background="Transparent">
+                    <Border Name="CheckBorder" Background="Transparent" BorderThickness="1"
+                            BorderBrush="Transparent" CornerRadius="5" />
+                    <Border Name="HoverLayer"
+                            Background="{DynamicResource AppSubtleHoverBrush}"
+                            CornerRadius="5" Opacity="0" IsHitTestVisible="False" />
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      Margin="{TemplateBinding Padding}"
+                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                      Foreground="{TemplateBinding Foreground}"
+                                      FontSize="{TemplateBinding FontSize}"
+                                      FontFamily="{TemplateBinding FontFamily}"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}" />
+                </Grid>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#HoverLayer">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="^:pressed /template/ Border#HoverLayer">
+            <Setter Property="Opacity" Value="1" />
+            <Setter Property="Background" Value="{DynamicResource AppSubtleHoverBrush}" />
+        </Style>
+        <Style Selector="^:checked /template/ Border#CheckBorder">
+            <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppAccentLineBrush}" />
+        </Style>
+        <Style Selector="^:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="^:checked:pointerover /template/ Border#CheckBorder">
+            <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}" />
+        </Style>
+        <Style Selector="^:disabled /template/ Grid#RootGrid">
+            <Setter Property="Opacity" Value="0.36" />
+        </Style>
+    </ControlTheme>
+
+    <!-- 分段开关（画廊工具栏的随机 / 自动刷新用）：形状与分段器一致 -->
+    <ControlTheme x:Key="AppSegmentToggle" TargetType="ToggleButton">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextSecondaryBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppHairlineStrongBrush}" />
+        <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
+        <Setter Property="Padding" Value="11,5" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontText}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <ControlTemplate TargetType="ToggleButton">
+                <Grid Name="RootGrid" Background="Transparent">
+                    <Border Name="CheckBorder"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}" />
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      Margin="{TemplateBinding Padding}"
+                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                      Foreground="{TemplateBinding Foreground}"
+                                      FontSize="{TemplateBinding FontSize}"
+                                      FontFamily="{TemplateBinding FontFamily}"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}" />
+                </Grid>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#CheckBorder">
+            <Setter Property="Background" Value="{DynamicResource AppSubtleHoverBrush}" />
+        </Style>
+        <Style Selector="^:pressed /template/ Border#CheckBorder">
+            <Setter Property="Background" Value="{DynamicResource AppSubtlePressedBrush}" />
+        </Style>
+        <Style Selector="^:checked /template/ Border#CheckBorder">
+            <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppAccentLineBrush}" />
+        </Style>
+        <Style Selector="^:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="^:checked:pointerover /template/ Border#CheckBorder">
+            <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}" />
+        </Style>
+        <Style Selector="^:disabled /template/ Grid#RootGrid">
+            <Setter Property="Opacity" Value="0.36" />
+        </Style>
+    </ControlTheme>
+
+    <!--
+        分段器容器（自定义控件 SegmentedControl 的主题）。
+        容器只是一道 1px 极细线围出来的凹槽，本身几乎不可见；
+        「当前选项」由选项自己的强调色底衬表达（见 AppSegmentRadio）。
+        ItemsHost 用 Grid 的星号列让每项等宽（在控件代码里按项数建列）。
+
+        键写成 {x:Type ...} 即「隐式控件主题」：三处用法（命令条的 NSFW 分段器、
+        设置页的 NSFW 与主题分段器）都只写 x:Name，不写 Theme=，
+        于是必须按类型自动命中。若这里保留字面量键名，控件会静默退回
+        Fluent 的默认皮肤 —— 不报错，但要截图才看得出来。
+    -->
+    <ControlTheme x:Key="{x:Type controls:SegmentedControl}" TargetType="controls:SegmentedControl">
+        <Setter Property="Template">
+            <ControlTemplate TargetType="controls:SegmentedControl">
+                <Border Background="{DynamicResource AppSurfaceSunkenBrush}"
+                        BorderBrush="{DynamicResource AppHairlineBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="3">
+                    <Grid Name="PART_ItemsHost" />
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </ControlTheme>
+
+    <!-- ==================== 导轨导航项 ==================== -->
+    <!--
+        56px 导轨里的一个目的地。
+        选中语义：强调色底衬 + 左缘 3×18 圆角指示条 + 图标转强调色。
+
+        两个 Min* 归零在 Avalonia 同样必须：Fluent 的 RadioButton 基线模板也带
+        MinWidth，而显式 Width 会被 MinWidth 夹回去 —— 于是「56 宽」的导航项
+        实际排得更宽，横向溢出 56px 导轨、糊在内容区上。这个坑很隐蔽：
+        模板、列宽、截图缩放看着都对，只有量像素才发现。
+
+        提示气泡必须朝右开。导轨只有 56px 宽、且贴着窗口左缘，而默认的
+        Placement=Top 会把气泡在锚点正上方居中 —— 锚点才 56px 宽，气泡却有一百余
+        像素，于是向左溢出窗口、被裁掉开头的字。
+    -->
+    <ControlTheme x:Key="AppRailItem" TargetType="RadioButton">
+        <Setter Property="Width" Value="56" />
+        <Setter Property="Height" Value="44" />
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextTertiaryBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="ToolTip.Placement" Value="Right" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <ControlTemplate TargetType="RadioButton">
+                <Grid Name="RootGrid" Background="Transparent">
+                    <!-- 底衬内缩 8px：命中区域撑满导轨宽度，但视觉块不贴边 -->
+                    <Border Name="Fill" Margin="8,3,8,3"
+                            Background="{TemplateBinding Background}"
+                            BorderThickness="1" BorderBrush="Transparent"
+                            CornerRadius="10" />
+                    <Border Name="FocusRing" Margin="8,3,8,3" BorderThickness="2" Opacity="0"
+                            CornerRadius="10" BorderBrush="{DynamicResource AppFocusRingBrush}"
+                            IsHitTestVisible="False" />
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      Foreground="{TemplateBinding Foreground}"
+                                      FontSize="{TemplateBinding FontSize}"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}" />
+                    <!-- 选中指示：贴着导轨左缘的一道强调色细条 -->
+                    <Border Name="Indicator" Width="3" Height="18" CornerRadius="2"
+                            Margin="4,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center"
+                            Opacity="0" Background="{DynamicResource AppAccentBrush}" />
+                </Grid>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#Fill">
+            <Setter Property="Background" Value="{DynamicResource AppSubtleHoverBrush}" />
+        </Style>
+        <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+        </Style>
+        <Style Selector="^:pressed /template/ Border#Fill">
+            <Setter Property="Background" Value="{DynamicResource AppSubtlePressedBrush}" />
+        </Style>
+        <Style Selector="^:checked /template/ Border#Fill">
+            <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}" />
+        </Style>
+        <Style Selector="^:checked /template/ Border#Indicator">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+        <Style Selector="^:checked /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+        </Style>
+        <Style Selector="^:checked:pointerover /template/ Border#Fill">
+            <Setter Property="BorderBrush" Value="{DynamicResource AppAccentLineBrush}" />
+        </Style>
+        <Style Selector="^:disabled /template/ Grid#RootGrid">
+            <Setter Property="Opacity" Value="0.3" />
+        </Style>
+        <Style Selector="^:focus /template/ Border#FocusRing">
+            <Setter Property="Opacity" Value="1" />
+        </Style>
+    </ControlTheme>
+
+    <!-- ==================== 自定义控件 ==================== -->
+
+    <!-- 进度环：Avalonia 没有 ProgressRing，用自绘控件补上（见 Controls/ProgressRing.cs） -->
+    <ControlTheme x:Key="AppProgressRing" TargetType="controls:ProgressRing">
+        <Setter Property="Width" Value="20" />
+        <Setter Property="Height" Value="20" />
+        <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+        <Setter Property="StrokeThickness" Value="2.5" />
+    </ControlTheme>
+
+    <!-- 信息条：替代 WinUI 的 InfoBar（Avalonia 无对应控件） -->
+    <ControlTheme x:Key="AppInfoBar" TargetType="controls:InfoBar">
+        <Setter Property="Background" Value="{DynamicResource AppCardFillBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppHairlineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
+        <Setter Property="Padding" Value="13,10" />
+        <Setter Property="Template">
+            <ControlTemplate TargetType="controls:InfoBar">
+                <Border Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{TemplateBinding CornerRadius}"
+                        Padding="{TemplateBinding Padding}">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                        <controls:FontIcon Name="Icon" FontSize="15"
+                                           VerticalAlignment="Top" Margin="0,1,0,0"
+                                           Glyph="{TemplateBinding SeverityGlyph}"
+                                           Foreground="{TemplateBinding SeverityBrush}" />
+                        <StackPanel Grid.Column="1" Spacing="3">
+                            <TextBlock Name="TitleText" Text="{TemplateBinding Title}"
+                                       Theme="{StaticResource AppSettingsTitle}"
+                                       FontWeight="SemiBold" />
+                            <TextBlock Name="MessageText" Text="{TemplateBinding Message}"
+                                       Theme="{StaticResource AppSettingsDesc}"
+                                       Foreground="{DynamicResource AppTextSecondaryBrush}" />
+                            <ContentPresenter Name="PART_ActionHost"
+                                              Content="{TemplateBinding ActionContent}"
+                                              Margin="0,6,0,0" />
+                        </StackPanel>
+                        <Button Name="PART_CloseButton" Grid.Column="2" VerticalAlignment="Top"
+                                Theme="{StaticResource AppSmallIconButton}"
+                                IsVisible="{TemplateBinding IsClosable}">
+                            <controls:FontIcon Glyph="&#xE711;" FontSize="10" />
+                        </Button>
+                    </Grid>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </ControlTheme>
+
+    <!-- 确认对话框：替代 WinUI 的 ContentDialog（Avalonia 无对应控件） -->
+    <ControlTheme x:Key="AppConfirmDialog" TargetType="controls:ConfirmDialog">
+        <Setter Property="Template">
+            <ControlTemplate TargetType="controls:ConfirmDialog">
+                <Grid>
+                    <Border Name="PART_Scrim" Background="{DynamicResource AppSmokeBrush}" />
+                    <Border Theme="{StaticResource AppDialogPanel}"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <StackPanel Spacing="16" MaxWidth="400">
+                            <TextBlock Text="{TemplateBinding Title}"
+                                       Theme="{StaticResource AppCardTitleText}" FontSize="17" />
+                            <ContentPresenter Name="PART_ContentHost"
+                                              Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}" />
+                            <StackPanel Orientation="Horizontal" Spacing="9"
+                                        HorizontalAlignment="Right">
+                                <Button Name="PART_CloseButton" Content="{TemplateBinding CloseButtonText}"
+                                        Theme="{StaticResource AppPillButton}" />
+                                <Button Name="PART_PrimaryButton" Content="{TemplateBinding PrimaryButtonText}"
+                                        Theme="{StaticResource AppAccentButton}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </ControlTemplate>
+        </Setter>
+    </ControlTheme>
+
+    <!--
+        原生控件的形状归位（ComboBox / TextBox / NumericUpDown / CheckBox /
+        ToggleSwitch / ProgressBar / ToolTip / FlyoutPresenter / ScrollViewer）
+        已迁到 Styles/AppElementStyles.axaml。它们是无 x:Key 的**全局 Style**，
+        而本文件是 ResourceDictionary —— 后者只接受 KeyValuePair，装不下 Style
+        （AVLN3000）。详见那个文件的头部说明。
+    -->
+
+</ResourceDictionary>

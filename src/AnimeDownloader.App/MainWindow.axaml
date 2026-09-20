@@ -1,0 +1,259 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:AnimeDownloader.App.Controls"
+        xmlns:sources="clr-namespace:AnimeDownloader.Core.Sources;assembly=AnimeDownloader.Core"
+        xmlns:automation="using:Avalonia.Automation"
+        x:Class="AnimeDownloader.App.MainWindow"
+        Title="AnimeDownloader"
+        Background="{DynamicResource AppBackgroundBrush}"
+        Width="1360" Height="860"
+        MinWidth="980" MinHeight="620">
+
+    <!--
+        ============================================================================
+        外壳：56px 图标导轨 + 常驻命令条
+        ============================================================================
+        结构与 WinUI 版逐段对应：
+            导轨   —— 只负责「我在哪」（图标 + 指示条），永不抢宽度。
+            命令条 —— 只负责「我在看什么」（图源 / 过滤 / 状态 / 操作），常驻在内容上方。
+
+        为什么导轨是手绘的 Grid 而不是 NavigationView / SplitView：后者的收起态会把
+        PaneCustomContent 整段渲染进 56px 的窄栏里（内容被裁成残句）、把菜单项挤到
+        导轨底部，且选中指示条不吃应用层的资源覆盖。三个图标不值得付出这些代价。
+
+        —— 三处 Avalonia 专有的换算 ——
+        1. <c>Frame</c> 不存在：页缓存导航改成 <c>ContentControl</c> + 代码里持有页面实例字典。
+           好处是「切页不重建」这条行为和 WinUI 的 Frame 默认缓存一致，且不引入导航栈。
+        2. F11 与 Esc 都走 <see cref="Window"/> 的 KeyDown（路由事件会从焦点元素冒泡到窗口），
+           不再需要 KeyboardAccelerator。Esc 只在全屏时接管 —— 无条件吞掉会抢走
+           ComboBox / 弹层的 Esc。
+        3. 清缓存确认框从 ContentDialog 换成自绘的 ConfirmDialog，作为根 Grid 的最后一个
+           子元素铺满整窗（跨两列），视觉上是「一块烟雾遮罩上浮起的面板」，与 WinUI 版一致。
+    -->
+    <Grid x:Name="Root">
+
+        <Grid.ColumnDefinitions>
+            <!--
+                导轨列**刻意不给 x:Name**：Avalonia 的命名作用域是否覆盖
+                Grid.ColumnDefinitions 里的集合项并不明确，而这里要的就是「拿这个对象改宽度」。
+                代码从 Root.ColumnDefinitions[0] 取，语义一样但零不确定性。
+            -->
+            <ColumnDefinition Width="56" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ==================== 导轨 ==================== -->
+        <Border x:Name="RailHost"
+                Grid.Column="0"
+                Background="{DynamicResource AppRailBrush}"
+                BorderBrush="{DynamicResource AppHairlineBrush}"
+                BorderThickness="0,0,1,0">
+            <Grid RowDefinitions="Auto,*,Auto">
+
+                <!--
+                    三个目的地：顶对齐，各自带图标与提示。
+                    注意这里用 Margin 而不是 Padding：WinUI 的 StackPanel 有 Padding，
+                    Avalonia 的没有（只能靠 Margin 或外面套 Border）。本处面板是该行唯一
+                    内容、又没有背景，两种写法在视觉上完全等价。
+                -->
+                <StackPanel Grid.Row="0" Spacing="2" Margin="0,12,0,0">
+                    <RadioButton x:Name="GalleryRailItem" Tag="gallery" GroupName="RailNav"
+                                 Theme="{StaticResource AppRailItem}"
+                                 automation:AutomationProperties.Name="画廊"
+                                 ToolTip.Tip="画廊 — 浏览当前图源的图片">
+                        <controls:FontIcon Glyph="&#xE91B;" FontSize="17" />
+                    </RadioButton>
+                    <RadioButton x:Name="ViewerRailItem" Tag="viewer" GroupName="RailNav"
+                                 Theme="{StaticResource AppRailItem}"
+                                 automation:AutomationProperties.Name="灯箱"
+                                 ToolTip.Tip="灯箱 — 单图细看（画廊里双击图片也可进入）">
+                        <controls:FontIcon Glyph="&#xE740;" FontSize="17" />
+                    </RadioButton>
+                    <RadioButton x:Name="SettingsRailItem" Tag="settings" GroupName="RailNav"
+                                 Theme="{StaticResource AppRailItem}"
+                                 automation:AutomationProperties.Name="设置"
+                                 ToolTip.Tip="设置 — 图源凭据、网络、下载">
+                        <controls:FontIcon Glyph="&#xE713;" FontSize="17" />
+                    </RadioButton>
+                </StackPanel>
+
+                <!--
+                    底部：快捷键速查（浮层）+ 应用标记。
+                    快捷键表原本住在 NavigationView 的展开面板里，而展开面板在收起态
+                    会把内容挤进 56px，因此改挂在一枚按钮的浮层上 —— 信息还在，导轨干净。
+                -->
+                <StackPanel Grid.Row="2" Margin="0,0,0,14" Spacing="6" HorizontalAlignment="Center">
+                    <Button Theme="{StaticResource AppIconButton}"
+                            automation:AutomationProperties.Name="快捷键速查"
+                            ToolTip.Placement="Right"
+                            ToolTip.Tip="快捷键速查">
+                        <controls:FontIcon Glyph="&#xE765;" FontSize="14" />
+                        <Button.Flyout>
+                            <Flyout Placement="RightEdgeAlignedTop">
+                                <StackPanel Spacing="12" MinWidth="252" Margin="14,12">
+                                    <TextBlock Text="快捷键" Theme="{StaticResource AppGroupHeader}" />
+                                    <Grid ColumnSpacing="18" RowSpacing="7"
+                                          RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+                                          ColumnDefinitions="Auto,*">
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="← →"
+                                                   Theme="{StaticResource AppCaptionText}" />
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="上一页 / 下一页"
+                                                   Theme="{StaticResource AppHintText}" />
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Space"
+                                                   Theme="{StaticResource AppCaptionText}" />
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="换一张"
+                                                   Theme="{StaticResource AppHintText}" />
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Enter"
+                                                   Theme="{StaticResource AppCaptionText}" />
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="打开大图"
+                                                   Theme="{StaticResource AppHintText}" />
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Ctrl S"
+                                                   Theme="{StaticResource AppCaptionText}" />
+                                        <TextBlock Grid.Row="3" Grid.Column="1" Text="保存当前图片"
+                                                   Theme="{StaticResource AppHintText}" />
+                                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl 0"
+                                                   Theme="{StaticResource AppCaptionText}" />
+                                        <TextBlock Grid.Row="4" Grid.Column="1" Text="适应屏幕"
+                                                   Theme="{StaticResource AppHintText}" />
+                                        <TextBlock Grid.Row="5" Grid.Column="0" Text="F11"
+                                                   Theme="{StaticResource AppCaptionText}" />
+                                        <TextBlock Grid.Row="5" Grid.Column="1" Text="全屏"
+                                                   Theme="{StaticResource AppHintText}" />
+                                    </Grid>
+                                    <Border Height="1" Background="{DynamicResource AppHairlineBrush}" />
+                                    <StackPanel Orientation="Horizontal" Spacing="9">
+                                        <TextBlock Text="AnimeDownloader"
+                                                   Theme="{StaticResource AppCaptionText}" />
+                                        <TextBlock x:Name="VersionText" Text=""
+                                                   Theme="{StaticResource AppCaptionText}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
+                    <Image x:Name="FooterLogo" Width="20" Height="20"
+                           Stretch="UniformToFill" Opacity="0.6"
+                           ToolTip.Placement="Right"
+                           ToolTip.Tip="AnimeDownloader" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ==================== 命令条 + 内容 ==================== -->
+        <Grid Grid.Column="1" RowDefinitions="Auto,*">
+
+            <!--
+                命令条：图源与过滤常驻可见 —— 这是旧版最大的可用性问题
+                （每次换图源都要先展开侧栏）。状态与操作落在右端对齐。
+
+                列宽分配是这条栏的关键（窄窗口下会立刻暴露）：
+                    图源 / 过滤 / 操作 = Auto —— 它们是「不许被压缩」的控件；
+                    状态 = *  —— 空间不够时先由它让位，省略号收尾。
+                把过滤放进 * 列（或让状态去挤它）会出现分段器被右端状态压掉一半的
+                重叠画面，而且每个列都会各自「尽量满足自己」，看起来完全不讲道理。
+            -->
+            <Border x:Name="CommandBarHost" Grid.Row="0" Height="50"
+                    Background="{DynamicResource AppBackgroundBrush}"
+                    BorderBrush="{DynamicResource AppHairlineBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="20,0,16,0">
+                <Grid ColumnSpacing="12" ColumnDefinitions="Auto,Auto,Auto,*,Auto">
+
+                    <!-- 图源 -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="图源" Theme="{StaticResource AppLabel}" />
+                        <ComboBox x:Name="SourceCombo"
+                                  MinWidth="168" MaxWidth="240"
+                                  MaxDropDownHeight="420"
+                                  VerticalAlignment="Center"
+                                  ToolTip.Tip="选择图源">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="sources:IImageSource">
+                                    <StackPanel Spacing="1" Margin="0,3" MaxWidth="320">
+                                        <TextBlock Text="{Binding DisplayName}" FontSize="12.5" />
+                                        <TextBlock Text="{Binding Description}" FontSize="11"
+                                                   Foreground="{DynamicResource AppTextTertiaryBrush}"
+                                                   TextTrimming="CharacterEllipsis" MaxLines="1" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <Border Grid.Column="1" Width="1" Height="18"
+                            Background="{DynamicResource AppHairlineStrongBrush}"
+                            VerticalAlignment="Center" />
+
+                    <!-- 过滤：放在 Auto 列，永不压缩 -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="过滤" Theme="{StaticResource AppLabel}" />
+                        <controls:SegmentedControl x:Name="NsfwSegmented"
+                                                   MinWidth="196"
+                                                   VerticalAlignment="Center"
+                                                   ToolTip.Tip="NSFW 过滤" />
+                    </StackPanel>
+
+                    <!-- 缩略图 + 状态：星号列，空间不足时缩成省略号 -->
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8"
+                                HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Border x:Name="HeaderThumbBorder" Width="26" Height="26" CornerRadius="6"
+                                Background="{DynamicResource AppCardFillBrush}"
+                                BorderBrush="{DynamicResource AppHairlineStrongBrush}"
+                                BorderThickness="1"
+                                VerticalAlignment="Center"
+                                IsVisible="False">
+                            <Image x:Name="HeaderThumb" Stretch="UniformToFill" />
+                        </Border>
+
+                        <!-- 用 Grid 而不是 StackPanel：只有星号列里的文本才会真的收缩，
+                             横向 StackPanel 会给文本它的完整期望宽度然后被裁掉右边。 -->
+                        <Grid ColumnSpacing="6" MaxWidth="230" Margin="4,0,4,0"
+                              VerticalAlignment="Center"
+                              ColumnDefinitions="Auto,*">
+                            <Ellipse x:Name="StatusDot"
+                                     Theme="{StaticResource AppStatusDot}"
+                                     VerticalAlignment="Center" />
+                            <TextBlock x:Name="GlobalStatusText" Grid.Column="1" Text="就绪"
+                                       Theme="{StaticResource AppCaptionText}" />
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- 操作 -->
+                    <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="6"
+                                VerticalAlignment="Center">
+                        <Button x:Name="GlobalRefreshButton" Theme="{StaticResource AppPillButton}"
+                                Click="OnGlobalRefresh" ToolTip.Tip="重新加载当前页面"
+                                Padding="12,6">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <controls:FontIcon Glyph="&#xE72C;" FontSize="12" />
+                                <TextBlock x:Name="RefreshButtonText" Text="刷新"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="ClearCacheButton" Theme="{StaticResource AppIconButton}"
+                                Click="OnClearCacheClick" ToolTip.Tip="清理缩略图缓存">
+                            <controls:FontIcon Glyph="&#xE74D;" FontSize="13" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <ContentControl x:Name="ContentFrame" Grid.Row="1" />
+        </Grid>
+
+        <!--
+            清缓存确认框：铺满整窗（跨导轨与内容两列），对应 WinUI 的 ContentDialog。
+            放在根 Grid 的最后一个子元素 = 最上层；遮罩自身带背景，天然吃掉下层点击。
+        -->
+        <controls:ConfirmDialog x:Name="ClearCacheDialog" Grid.ColumnSpan="2"
+                                Title="清理缓存"
+                                PrimaryButtonText="清理"
+                                CloseButtonText="取消">
+            <TextBlock x:Name="ClearCacheMessage" TextWrapping="Wrap" MaxWidth="360"
+                       Foreground="{DynamicResource AppTextSecondaryBrush}"
+                       FontSize="12.5" LineHeight="19" />
+        </controls:ConfirmDialog>
+    </Grid>
+</Window>

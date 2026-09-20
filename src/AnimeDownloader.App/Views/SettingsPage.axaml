@@ -1,0 +1,308 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:AnimeDownloader.App.Controls"
+             xmlns:views="clr-namespace:AnimeDownloader.App.Views"
+             xmlns:automation="using:Avalonia.Automation"
+             x:Class="AnimeDownloader.App.Views.SettingsPage">
+
+    <!--
+        设置 = 参数表（Spec Sheet）
+        ============================================================================
+        旧版是 Win11「设置」的复刻：一堆分组标题 + 一摞圆角卡片。功能正确，
+        但它看起来像操作系统，而不像这个应用。
+        新版改用印刷品的双栏参数表：
+            左栏是分组名（页边注），右栏是逐行参数，行与行之间只用一条 1px 极细线分割。
+            没有卡片、没有圆角、没有阴影 —— 层级完全由留白与细线建立。
+
+        宽度策略：参数表的行宽有上限（MaxWidth 1000），超过之后左右留白、整张表居中。
+        为什么是 Center 而不是 Stretch：在 WinUI 里「ScrollViewer 的子树 +
+        HorizontalAlignment=Stretch + MaxWidth」会把整张表整体右移并溢出右边缘
+        （星号列按未夹的宽度计算，整块却按夹过的宽度摆放），实测过，不能用。
+        Center 的语义是明确的：宽度取 min(可用, 上限)，剩余空间平分到两侧。
+        窄窗口下星号列自然收缩，不需要额外规则。
+
+        —— Avalonia 侧的三处控件替换 ——
+        NumberBox    → NumericUpDown（Value 是 decimal?）
+        ToggleSwitch → ToggleSwitch（IsOn → IsChecked）
+        TextBox.Header → 没有对应物，改成一行 AppLabel 小字 + 输入框（视觉上同构）
+    -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="32,24,32,48" Spacing="0"
+                    MaxWidth="1000" HorizontalAlignment="Center">
+
+            <!-- 页面标题 -->
+            <TextBlock Text="偏好设置" Theme="{StaticResource AppEyebrow}" />
+            <TextBlock Text="设置" Theme="{StaticResource AppSectionTitle}" Margin="0,5,0,0" />
+            <TextBlock Text="调整图源、网络与下载行为，保存后立即生效"
+                       Theme="{StaticResource AppHintText}"
+                       Margin="0,4,0,0" />
+
+            <Grid ColumnSpacing="36" Margin="0,30,0,0"
+                  ColumnDefinitions="146,*"
+                  RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+
+                <!-- ============ 通用 ============ -->
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="通用"
+                           Theme="{StaticResource AppGroupHeader}" Margin="0,15,0,0" />
+                <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,8,0,26">
+                    <Border Theme="{StaticResource AppSettingsCard}">
+                        <Grid Theme="{StaticResource AppSettingsRow}" Margin="0,13"
+                              ColumnDefinitions="*,Auto">
+                            <TextBlock Text="NSFW 过滤" Theme="{StaticResource AppSettingsTitle}" />
+                            <controls:SegmentedControl x:Name="NsfwSegmented" Grid.Column="1"
+                                                       MinWidth="196" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+                    <Border Theme="{StaticResource AppSettingsCard}">
+                        <Grid Theme="{StaticResource AppSettingsRow}" Margin="0,13"
+                              ColumnDefinitions="*,Auto">
+                            <TextBlock Text="主题" Theme="{StaticResource AppSettingsTitle}" />
+                            <controls:SegmentedControl x:Name="ThemeSegmented" Grid.Column="1"
+                                                       MinWidth="196" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+                    <Border Theme="{StaticResource AppSettingsCard}">
+                        <Grid Theme="{StaticResource AppSettingsRow}" Margin="0,11"
+                              ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="自动刷新" Theme="{StaticResource AppSettingsTitle}" />
+                                <TextBlock Text="按设定间隔自动重新加载画廊"
+                                           Theme="{StaticResource AppSettingsDesc}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="14"
+                                        VerticalAlignment="Center">
+                                <NumericUpDown x:Name="IntervalBox" Minimum="1" Value="30"
+                                               Width="124"
+                                               automation:AutomationProperties.Name="自动刷新间隔（秒）" />
+                                <ToggleSwitch x:Name="AutoReloadCheck" MinWidth="0"
+                                              OnContent="" OffContent="" Padding="0"
+                                              automation:AutomationProperties.Name="启用自动刷新" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    <Border Theme="{StaticResource AppSettingsCard}">
+                        <Grid Theme="{StaticResource AppSettingsRow}" Margin="0,11"
+                              ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="画廊每页数量" Theme="{StaticResource AppSettingsTitle}" />
+                                <TextBlock Text="随机模式下一次加载的图片数（1–48）"
+                                           Theme="{StaticResource AppSettingsDesc}" />
+                            </StackPanel>
+                            <NumericUpDown x:Name="CountBox" Grid.Column="1" Minimum="1" Maximum="48"
+                                           Value="12" Width="124" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <!-- ============ 网络与代理 ============ -->
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="网络与代理"
+                           Theme="{StaticResource AppGroupHeader}" Margin="0,15,0,0" />
+                <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,8,0,26">
+                    <Border Theme="{StaticResource AppSettingsCard}">
+                        <StackPanel Margin="0,13" Spacing="9">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="手动代理地址" Theme="{StaticResource AppSettingsTitle}" />
+                                <TextBlock Text="留空自动检测系统代理（HTTP CONNECT 与 SOCKS5 均可）"
+                                           Theme="{StaticResource AppSettingsDesc}" />
+                            </StackPanel>
+                            <TextBox x:Name="ProxyBox" MaxWidth="420" HorizontalAlignment="Left"
+                                     PlaceholderText="http://127.0.0.1:7890 或 socks5://127.0.0.1:1088" />
+                        </StackPanel>
+                    </Border>
+                    <Border Theme="{StaticResource AppSettingsCard}">
+                        <Grid Theme="{StaticResource AppSettingsRow}" Margin="0,11"
+                              ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="请求超时" Theme="{StaticResource AppSettingsTitle}" />
+                                <TextBlock Text="单次网络请求的超时时间（5–120 秒）"
+                                           Theme="{StaticResource AppSettingsDesc}" />
+                            </StackPanel>
+                            <NumericUpDown x:Name="TimeoutBox" Grid.Column="1" Minimum="5" Maximum="120"
+                                           Value="20" Width="124" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+                    <Border Theme="{StaticResource AppSettingsCard}">
+                        <Grid Theme="{StaticResource AppSettingsRow}" Margin="0,11"
+                              ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="不使用代理" Theme="{StaticResource AppSettingsTitle}" />
+                                <TextBlock Text="忽略系统代理与手动代理，全部直连"
+                                           Theme="{StaticResource AppSettingsDesc}" />
+                            </StackPanel>
+                            <CheckBox x:Name="NoProxyCheck" Grid.Column="1" Content="" MinWidth="0"
+                                      VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <!-- ============ 图源凭据 ============ -->
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="图源凭据"
+                           Theme="{StaticResource AppGroupHeader}" Margin="0,15,0,0" />
+                <Border Grid.Row="2" Grid.Column="1" Theme="{StaticResource AppSettingsCard}"
+                        Margin="0,8,0,26">
+                    <StackPanel Margin="0,13" Spacing="10">
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="Gelbooru API 凭据" Theme="{StaticResource AppSettingsTitle}" />
+                            <TextBlock TextWrapping="Wrap" MaxWidth="520"
+                                       Theme="{StaticResource AppSettingsDesc}"
+                                       Text="Gelbooru 已停用匿名 API：登录 gelbooru.com 后在 Account 页获取 user_id 与 api_key 并填入，否则该图源返回 401。" />
+                        </StackPanel>
+                        <Grid ColumnSpacing="12" MaxWidth="520" HorizontalAlignment="Left"
+                              ColumnDefinitions="*,*">
+                            <StackPanel Grid.Column="0" Spacing="5">
+                                <TextBlock Text="user_id" Theme="{StaticResource AppLabel}" />
+                                <TextBox x:Name="GelbooruUserIdBox"
+                                         PlaceholderText="例如 1234567" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="5">
+                                <TextBlock Text="api_key" Theme="{StaticResource AppLabel}" />
+                                <TextBox x:Name="GelbooruApiKeyBox"
+                                         PlaceholderText="账户页生成的 API Key" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ 下载 ============ -->
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="下载"
+                           Theme="{StaticResource AppGroupHeader}" Margin="0,15,0,0" />
+                <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,8,0,26">
+                    <Border Theme="{StaticResource AppSettingsCard}">
+                        <StackPanel Margin="0,13" Spacing="9">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="批量下载目录" Theme="{StaticResource AppSettingsTitle}" />
+                                <TextBlock Text="「下载全部」保存图片的位置"
+                                           Theme="{StaticResource AppSettingsDesc}" />
+                            </StackPanel>
+                            <Grid ColumnSpacing="8" MaxWidth="520" HorizontalAlignment="Left"
+                                  ColumnDefinitions="*,Auto">
+                                <TextBox x:Name="DownloadDirBox" Grid.Column="0"
+                                         PlaceholderText="选择保存图片的文件夹" />
+                                <Button x:Name="BrowseDirButton" Grid.Column="1" Content="浏览…"
+                                        Theme="{StaticResource AppPillButton}"
+                                        Click="OnBrowseDir" VerticalAlignment="Center" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <Border Theme="{StaticResource AppSettingsCard}">
+                        <Grid Theme="{StaticResource AppSettingsRow}" Margin="0,11"
+                              ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="最大并发下载数" Theme="{StaticResource AppSettingsTitle}" />
+                                <TextBlock Text="同时下载缩略图与图片的连接数（1–16）"
+                                           Theme="{StaticResource AppSettingsDesc}" />
+                            </StackPanel>
+                            <NumericUpDown x:Name="ConcurrencyBox" Grid.Column="1" Minimum="1" Maximum="16"
+                                           Value="4" Width="124" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+                    <Border Theme="{StaticResource AppSettingsCard}">
+                        <Grid Theme="{StaticResource AppSettingsRow}" Margin="0,11"
+                              ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="缩略图缓存" Theme="{StaticResource AppSettingsTitle}" />
+                                <TextBlock Text="内存 + 磁盘缓存，重复加载画廊几乎零等待"
+                                           Theme="{StaticResource AppSettingsDesc}" />
+                            </StackPanel>
+                            <ToggleSwitch x:Name="CacheToggle" Grid.Column="1" MinWidth="0"
+                                          OnContent="" OffContent="" Padding="0"
+                                          VerticalAlignment="Center"
+                                          automation:AutomationProperties.Name="启用缩略图缓存" />
+                        </Grid>
+                    </Border>
+                    <Border Theme="{StaticResource AppSettingsCard}">
+                        <StackPanel Margin="0,13" Spacing="9">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="缩略图代理模板" Theme="{StaticResource AppSettingsTitle}" />
+                                <TextBlock TextWrapping="Wrap" MaxWidth="520"
+                                           Theme="{StaticResource AppSettingsDesc}"
+                                           Text="可选。含 {url} 占位符的压缩代理，进一步降低无原生缩略图图源的首载流量。" />
+                            </StackPanel>
+                            <TextBox x:Name="ProxyTemplateBox" MaxWidth="520" HorizontalAlignment="Left"
+                                     PlaceholderText="https://images.weserv.nl/?url={url}&amp;w=480&amp;h=480&amp;fit=cover&amp;output=jpg" />
+                        </StackPanel>
+                    </Border>
+                    <Border Theme="{StaticResource AppSettingsCard}">
+                        <Grid Theme="{StaticResource AppSettingsRow}" Margin="0,11"
+                              ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="清理缩略图缓存" Theme="{StaticResource AppSettingsTitle}" />
+                                <TextBlock Text="删除磁盘缓存，画廊缩略图将重新联网加载"
+                                           Theme="{StaticResource AppSettingsDesc}" />
+                            </StackPanel>
+                            <Button x:Name="ClearCacheButton" Grid.Column="1" Content="清理缓存"
+                                    Theme="{StaticResource AppPillButton}"
+                                    Click="OnClearCache" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <!-- ============ 网络检测 ============ -->
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="网络检测"
+                           Theme="{StaticResource AppGroupHeader}" Margin="0,15,0,0" />
+                <Border Grid.Row="4" Grid.Column="1" Theme="{StaticResource AppSettingsCard}"
+                        Margin="0,8,0,26">
+                    <StackPanel Margin="0,13" Spacing="12">
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="检测源连通性" Theme="{StaticResource AppSettingsTitle}" />
+                            <TextBlock TextWrapping="Wrap" MaxWidth="520"
+                                       Theme="{StaticResource AppSettingsDesc}"
+                                       Text="分别以直连和当前代理设置探测各图源，标出哪些源需要科学上网。" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Button x:Name="ProbeButton" Content="开始检测"
+                                    Theme="{StaticResource AppPillButton}" Click="OnProbeConnectivity" />
+                            <controls:ProgressRing x:Name="ProbeRing"
+                                                   Theme="{StaticResource AppProgressRing}"
+                                                   Width="18" Height="18" IsActive="False"
+                                                   VerticalAlignment="Center" />
+                        </StackPanel>
+                        <ItemsControl x:Name="ProbeResults">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="views:ProbeRow">
+                                    <Grid ColumnSpacing="10" Margin="0,3"
+                                          ColumnDefinitions="Auto,Auto,*">
+                                        <controls:FontIcon Glyph="{Binding StatusGlyph}" FontSize="13"
+                                                           Foreground="{Binding StatusBrush}" />
+                                        <TextBlock Text="{Binding DisplayName}" Grid.Column="1"
+                                                   Theme="{StaticResource AppSettingsTitle}" />
+                                        <TextBlock Text="{Binding StatusText}" Grid.Column="2"
+                                                   Theme="{StaticResource AppSettingsDesc}"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ 图源标签 ============ -->
+                <TextBlock Grid.Row="5" Grid.Column="0" Text="图源标签"
+                           Theme="{StaticResource AppGroupHeader}" Margin="0,15,0,0" />
+                <Border Grid.Row="5" Grid.Column="1" Theme="{StaticResource AppSettingsCard}"
+                        Margin="0,8,0,0">
+                    <StackPanel x:Name="TagsPanel" Margin="0,13" Spacing="9" />
+                </Border>
+            </Grid>
+
+            <controls:InfoBar x:Name="WarningBar" Theme="{StaticResource AppInfoBar}"
+                              IsOpen="False" Severity="Warning" IsClosable="True"
+                              Margin="0,20,0,0" />
+
+            <!-- 提交行：主操作是强调色，次操作是细线；状态说明退到等宽小字 -->
+            <Border BorderBrush="{DynamicResource AppHairlineStrongBrush}" BorderThickness="0,1,0,0"
+                    Margin="0,26,0,0" Padding="0,16,0,0">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Button x:Name="SaveButton" Content="保存设置"
+                            Theme="{StaticResource AppAccentButton}" Click="OnSave" />
+                    <Button x:Name="ResetButton" Content="恢复默认"
+                            Theme="{StaticResource AppPillButton}" Click="OnReset" />
+                    <TextBlock x:Name="StatusText" Theme="{StaticResource AppCaptionText}"
+                               Margin="6,0,0,0" VerticalAlignment="Center" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

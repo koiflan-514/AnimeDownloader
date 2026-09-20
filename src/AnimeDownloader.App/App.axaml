@@ -1,0 +1,59 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AnimeDownloader.App.App"
+             RequestedThemeVariant="Default">
+
+    <!--
+        ============================================================================
+        资源装配 —— 这个顺序本身就是一份「为什么之前不生效」的说明
+        ============================================================================
+        Avalonia 里样式的合并顺序有意义（后者压前者），资源字典的合并顺序**没有**
+        「后合并者赢」的语义 —— 两者是不同的机制，不能混为一谈：
+
+            Application.Styles   ← 框架基线 FluentTheme + 我们自己的**全局 Style**
+                                   （AppElementStyles：ComboBox / TextBox / ToolTip
+                                    这类原生控件的形状与字号归位）。
+                                   带 x:Key 的控件主题全部放在 Application.Resources
+                                   里（见下），因为那里是「同一作用域」，
+                                   跨字典引用最确定；而无 Key 的全局 Style 放不进
+                                   ResourceDictionary（AVLN3000）。
+            Application.Resources.MergedDictionaries
+                                 1. Tokens          —— 设计令牌（纯数据，不引用任何兄弟字典）
+                                 2. FluentOverrides —— 把 Fluent 的中性灰阶收进暗房的炭灰阶梯
+                                 3. AppStyles       —— 排版 / 表面 / 状态 / 交互控件主题
+
+        FluentOverrides 必须排在 FluentTheme 的解析之前生效。实测确认：
+        Application.Resources 里的主题字典**确实**能压住 FluentTheme 的同名键
+        （探针把 ComboBoxBackground 改成红色，ComboBox 模板里的 Border#Background
+        真的变成了红色；TextBox 的 PART_BorderElement 同样跟着变）。
+        这不是推测 —— 这个结论决定了整个重上色方案是否成立，所以先验证再写。
+
+        与 WinUI 版的对应关系：
+            XamlControlsResources  → FluentTheme
+            Styles/AppStyles.xaml  → Styles/AppStyles.axaml（排版 + 控件主题，合成一本）
+            Styles/FluentTheme.xaml→ Styles/FluentOverrides.axaml（覆盖层）
+            App.xaml 里的 ThemeDictionaries → Styles/Tokens.axaml
+    -->
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://AnimeDownloader/Styles/Tokens.axaml" />
+                <ResourceInclude Source="avares://AnimeDownloader/Styles/FluentOverrides.axaml" />
+                <ResourceInclude Source="avares://AnimeDownloader/Styles/AppStyles.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+
+    <Application.Styles>
+        <FluentTheme />
+        <!--
+            全局 Style（无 x:Key，按类型隐式命中）必须在这里，不能进 Resources：
+            ResourceDictionary 只收 KeyValuePair（带 Key 的 ControlTheme 才能住进去），
+            塞 Style 会 AVLN3000。
+            排在 FluentTheme 之后 = 覆盖基线（Application.Styles 里后写的赢，
+            这与「资源字典合并无序」是两套机制，别混）。
+        -->
+        <StyleInclude Source="avares://AnimeDownloader/Styles/AppElementStyles.axaml" />
+    </Application.Styles>
+
+</Application>

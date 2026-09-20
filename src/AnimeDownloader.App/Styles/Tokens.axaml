@@ -1,0 +1,186 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        ============================================================================
+        暗房 (Darkroom) — 设计令牌 · Avalonia 版
+        ============================================================================
+        概念与 WinUI 版完全一致：中性冷调炭灰是「房间」，图片是唯一的光源，
+        用户的 Windows 强调色是暗房里的安全灯 —— 全应用唯一的彩色，
+        只出现在三种语义上：正在被选中 / 正在进行 / 需要你注意。
+
+        与 WinUI 版的两处机制差异（值不变，只有取色管道不同）：
+          1. **强调色色阶必须自己派生。** Avalonia 的 Fluent 主题只提供
+             SystemAccentColor 一个键，**没有** SystemAccentColorLight1-3 /
+             Dark1-3（已用二进制检索确认：Avalonia.Themes.Fluent.dll 里
+             只出现过 "SystemAccentColor" 这一个字符串）。
+             WinUI 那套 Light1-3/Dark1-3 是框架内建的，Avalonia 没有对应物 ——
+             所以这里**不能**写 {DynamicResource SystemAccentColorLight1}：
+             键不存在时不会报错，笔刷的 Color 会悬空，
+             「悬停变亮」「强调色描边」这些状态会静默变成透明（最难查的一类 bug）。
+             改法：本文件只给字面量兜底值，真实的整条色阶由
+             Platform/WindowsColorScheme.cs 在窗口显示之前**就地写进这些笔刷实例**
+             （Windows 上读 HKCU 的 AccentPalette，那份二进制正好就是
+             Light3/Light2/Light1/Accent/Dark1/Dark2/Dark3 八个色阶）。
+          2. 字距：WinUI 的 CharacterSpacing 单位是 1/1000 em，
+             Avalonia 的 LetterSpacing 单位是**像素**。换算见各条注释
+             （px = FontSize × CharacterSpacing / 1000）。
+        ============================================================================
+    -->
+
+    <!-- ==================== 字族（与内容无关，放在主题字典之外） ==================== -->
+    <!-- Display：标题与展板文字，收紧字距 -->
+    <FontFamily x:Key="AppFontDisplay">Segoe UI Variable Display, Segoe UI, Microsoft YaHei UI</FontFamily>
+    <!-- Text：正文与控件，Win11 文本光学尺寸 -->
+    <FontFamily x:Key="AppFontText">Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI</FontFamily>
+    <!-- Mono：所有数字与元数据 —— 本设计的签名细节 -->
+    <FontFamily x:Key="AppFontMono">Cascadia Mono, Consolas, Microsoft YaHei UI</FontFamily>
+    <!--
+        Icon：WinUI 的 FontIcon 用的就是 Segoe Fluent Icons。Avalonia 没有 FontIcon 控件，
+        这里保留同一个字族，让它逐字形一致（.ico 之外的图标全是字形而不是矢量图，
+        「布局与视觉一致」因此在像素层面成立）。
+    -->
+    <FontFamily x:Key="AppFontIcon">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+
+    <!-- ==================== 尺度令牌 ==================== -->
+    <CornerRadius x:Key="ControlCornerRadius">7</CornerRadius>
+    <CornerRadius x:Key="CardCornerRadius">12</CornerRadius>
+    <CornerRadius x:Key="PanelCornerRadius">14</CornerRadius>
+    <CornerRadius x:Key="PillCornerRadius">999</CornerRadius>
+    <Thickness x:Key="PagePadding">28,22,28,0</Thickness>
+    <Thickness x:Key="AppContentPadding">28,20,28,18</Thickness>
+    <Thickness x:Key="AppRailPadding">0,10,0,10</Thickness>
+    <x:Double x:Key="AppControlFontSize">12.5</x:Double>
+    <x:Double x:Key="AppRailWidth">56</x:Double>
+    <x:Double x:Key="AppCommandBarHeight">50</x:Double>
+
+    <ResourceDictionary.ThemeDictionaries>
+
+        <!-- ============================================================
+             Dark —— 默认形态。中性冷调炭灰阶梯 + 一个强调色。
+             ============================================================ -->
+        <ResourceDictionary x:Key="Dark">
+            <!-- 表面色阶：房间 → 相纸 → 抬升 → 下沉 -->
+            <SolidColorBrush x:Key="AppBackgroundBrush" Color="#FF0D0E11" />
+            <SolidColorBrush x:Key="AppRailBrush" Color="#FF0A0B0D" />
+            <SolidColorBrush x:Key="AppPanelFillBrush" Color="#FF14161A" />
+            <SolidColorBrush x:Key="AppCardFillBrush" Color="#FF14161A" />
+            <SolidColorBrush x:Key="AppCardFillHoverBrush" Color="#FF1B1E24" />
+            <SolidColorBrush x:Key="AppSurfaceSunkenBrush" Color="#FF07080A" />
+            <SolidColorBrush x:Key="AppTrackFillBrush" Color="#FF0D0E11" />
+            <SolidColorBrush x:Key="AppCardStrokeBrush" Color="#14FFFFFF" />
+
+            <!-- 极细线：本设计里唯一的「边框」语言 -->
+            <SolidColorBrush x:Key="AppHairlineBrush" Color="#14FFFFFF" />
+            <SolidColorBrush x:Key="AppHairlineStrongBrush" Color="#26FFFFFF" />
+
+            <!-- 悬停 / 按压填充：始终是加白的透明层，不吃色相 -->
+            <SolidColorBrush x:Key="AppSubtleHoverBrush" Color="#0FFFFFFF" />
+            <SolidColorBrush x:Key="AppSubtlePressedBrush" Color="#1AFFFFFF" />
+
+            <!-- 文本四级 -->
+            <SolidColorBrush x:Key="AppTextPrimaryBrush" Color="#FFEDEEF1" />
+            <SolidColorBrush x:Key="AppTextSecondaryBrush" Color="#FF9AA0AB" />
+            <SolidColorBrush x:Key="AppTextTertiaryBrush" Color="#FF6B7179" />
+            <SolidColorBrush x:Key="AppTextQuaternaryBrush" Color="#FF474C55" />
+
+            <!--
+                强调色：跟随 Windows 个性化设置。运行时由 WindowsColorScheme
+                就地改写这一整组笔刷（含 Light/Dark 色阶、底衬不透明度与墨色）。
+                字面量 #FF0078D4 是 Windows 的默认强调色，只作为首帧兜底 ——
+                窗口显示前服务一定已经写过一次，画面不会停在这个蓝上。
+            -->
+            <SolidColorBrush x:Key="AppAccentBrush" Color="#FF0078D4" />
+            <SolidColorBrush x:Key="AppAccentStrongBrush" Color="#FF0078D4" />
+            <SolidColorBrush x:Key="AppAccentSoftBrush" Color="#FF0078D4" Opacity="0.16" />
+            <SolidColorBrush x:Key="AppAccentLineBrush" Color="#FF0078D4" Opacity="0.42" />
+            <!-- 压在强调色实心块上的文字/图标；由服务按强调色亮度改写 -->
+            <SolidColorBrush x:Key="AppAccentInkBrush" Color="#FFFFFFFF" />
+            <!-- 键盘焦点环：Windows 的惯例就是强调色 -->
+            <SolidColorBrush x:Key="AppFocusRingBrush" Color="#FF0078D4" />
+
+            <!-- 状态：安静 / 工作 / 故障 -->
+            <SolidColorBrush x:Key="AppStatusIdleBrush" Color="#FF585E67" />
+            <SolidColorBrush x:Key="AppStatusOkBrush" Color="#FF585E67" />
+            <SolidColorBrush x:Key="AppStatusBusyBrush" Color="#FF0078D4" />
+            <SolidColorBrush x:Key="AppStatusErrorBrush" Color="#FFE0575E" />
+
+            <!-- 查看器 / 标签 / 浮动玻璃 -->
+            <SolidColorBrush x:Key="AppViewerBackgroundBrush" Color="#FF06070A" />
+            <SolidColorBrush x:Key="AppToolbarFillBrush" Color="#F214161A" />
+            <SolidColorBrush x:Key="AppTagChipBrush" Color="#0FFFFFFF" />
+            <LinearGradientBrush x:Key="AppScrimBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+                <GradientStop Offset="0" Color="#000B0C0F" />
+                <GradientStop Offset="1" Color="#E60B0C0F" />
+            </LinearGradientBrush>
+            <LinearGradientBrush x:Key="AppShimmerBrush" StartPoint="0%,0%" EndPoint="100%,0%">
+                <GradientStop Offset="0" Color="#00FFFFFF" />
+                <GradientStop Offset="0.5" Color="#0FFFFFFF" />
+                <GradientStop Offset="1" Color="#00FFFFFF" />
+            </LinearGradientBrush>
+
+            <!-- 覆盖层 / 对话框（对应 WinUI 的 SmokeFillColorDefaultBrush 与 ContentDialog*） -->
+            <SolidColorBrush x:Key="AppSmokeBrush" Color="#9907080A" />
+            <SolidColorBrush x:Key="AppDialogFillBrush" Color="#FF14161A" />
+            <SolidColorBrush x:Key="AppDialogStrokeBrush" Color="#26FFFFFF" />
+        </ResourceDictionary>
+
+        <!-- ============================================================
+             Light —— 白墙 + 同一个强调色，只是压深以保住对比度。
+             查看器底衬仍然是深色：那是一个有意的「灯箱凹槽」，不是配色事故。
+             ============================================================ -->
+        <ResourceDictionary x:Key="Light">
+            <SolidColorBrush x:Key="AppBackgroundBrush" Color="#FFF7F7F9" />
+            <SolidColorBrush x:Key="AppRailBrush" Color="#FFF1F1F4" />
+            <SolidColorBrush x:Key="AppPanelFillBrush" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="AppCardFillBrush" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="AppCardFillHoverBrush" Color="#FFFBFBFD" />
+            <SolidColorBrush x:Key="AppSurfaceSunkenBrush" Color="#FFEBEBEF" />
+            <SolidColorBrush x:Key="AppTrackFillBrush" Color="#FFF0F0F3" />
+            <SolidColorBrush x:Key="AppCardStrokeBrush" Color="#12000000" />
+
+            <SolidColorBrush x:Key="AppHairlineBrush" Color="#12000000" />
+            <SolidColorBrush x:Key="AppHairlineStrongBrush" Color="#21000000" />
+
+            <SolidColorBrush x:Key="AppSubtleHoverBrush" Color="#0A000000" />
+            <SolidColorBrush x:Key="AppSubtlePressedBrush" Color="#14000000" />
+
+            <SolidColorBrush x:Key="AppTextPrimaryBrush" Color="#FF15161A" />
+            <SolidColorBrush x:Key="AppTextSecondaryBrush" Color="#FF5A606A" />
+            <SolidColorBrush x:Key="AppTextTertiaryBrush" Color="#FF878D96" />
+            <SolidColorBrush x:Key="AppTextQuaternaryBrush" Color="#FFB3B7BE" />
+
+            <!-- 浅色表面上的强调色压深一档：同一个 Windows 强调色，
+                 只是在白底上需要更深的色阶才能站得住。服务会写入真正的 Dark1。 -->
+            <SolidColorBrush x:Key="AppAccentBrush" Color="#FF0078D4" />
+            <SolidColorBrush x:Key="AppAccentStrongBrush" Color="#FF0078D4" />
+            <SolidColorBrush x:Key="AppAccentSoftBrush" Color="#FF0078D4" Opacity="0.12" />
+            <SolidColorBrush x:Key="AppAccentLineBrush" Color="#FF0078D4" Opacity="0.45" />
+            <SolidColorBrush x:Key="AppAccentInkBrush" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="AppFocusRingBrush" Color="#FF0078D4" />
+
+            <SolidColorBrush x:Key="AppStatusIdleBrush" Color="#FF9AA0A8" />
+            <SolidColorBrush x:Key="AppStatusOkBrush" Color="#FF9AA0A8" />
+            <SolidColorBrush x:Key="AppStatusBusyBrush" Color="#FF0078D4" />
+            <SolidColorBrush x:Key="AppStatusErrorBrush" Color="#FFC0392F" />
+
+            <SolidColorBrush x:Key="AppViewerBackgroundBrush" Color="#FF16171B" />
+            <SolidColorBrush x:Key="AppToolbarFillBrush" Color="#F2FFFFFF" />
+            <SolidColorBrush x:Key="AppTagChipBrush" Color="#0A000000" />
+            <LinearGradientBrush x:Key="AppScrimBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+                <GradientStop Offset="0" Color="#00000000" />
+                <GradientStop Offset="1" Color="#73000000" />
+            </LinearGradientBrush>
+            <LinearGradientBrush x:Key="AppShimmerBrush" StartPoint="0%,0%" EndPoint="100%,0%">
+                <GradientStop Offset="0" Color="#00000000" />
+                <GradientStop Offset="0.5" Color="#12000000" />
+                <GradientStop Offset="1" Color="#00000000" />
+            </LinearGradientBrush>
+
+            <SolidColorBrush x:Key="AppSmokeBrush" Color="#66000000" />
+            <SolidColorBrush x:Key="AppDialogFillBrush" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="AppDialogStrokeBrush" Color="#21000000" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+
+</ResourceDictionary>

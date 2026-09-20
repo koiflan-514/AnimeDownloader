@@ -1,0 +1,93 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:AnimeDownloader.App.Controls"
+        x:Class="AnimeDownloader.App.Controls.GalleryViewerWindow"
+        Title="图片查看器"
+        Width="960" Height="680"
+        Background="{DynamicResource AppViewerBackgroundBrush}">
+
+    <!--
+        独立大图窗口：与「灯箱」同一套语言 —— 台面压到最深，控件退成玻璃。
+
+        Avalonia 侧的两点差异：
+          · 主题不再挂在根元素上（WinUI 是 Root.RequestedTheme），而是窗口自身的
+            RequestedThemeVariant —— Avalonia 的主题变体作用域就是 TopLevel。
+          · 强调色的实时跟随不需要逐窗注册：WindowsColorScheme 直接改写
+            Application.Resources 里的笔刷实例，所有窗口、所有控件共用同一份。
+    -->
+    <Grid x:Name="Root" RowDefinitions="*,Auto">
+
+        <Grid x:Name="ViewHost" Grid.Row="0">
+            <Image x:Name="ViewImage" Stretch="Uniform" />
+            <controls:ProgressRing x:Name="LoadingRing"
+                                   Theme="{StaticResource AppProgressRing}"
+                                   Width="36" Height="36" IsActive="False" />
+            <StackPanel x:Name="ErrorPanel" IsVisible="False"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+                <controls:FontIcon Glyph="&#xE7BA;" FontSize="28"
+                                   Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                <TextBlock x:Name="ErrorText" Text="加载失败"
+                           Foreground="{DynamicResource AppTextPrimaryBrush}" />
+            </StackPanel>
+        </Grid>
+
+        <!-- 底部：标签条（图片下方独立一栏，全屏时隐藏）+ 浮动工具栏 -->
+        <StackPanel Grid.Row="1" Spacing="10" Margin="0,0,0,14">
+            <Border x:Name="TagsHost"
+                    Margin="20,0,20,0" MaxHeight="140"
+                    Background="{DynamicResource AppToolbarFillBrush}"
+                    BorderBrush="{DynamicResource AppHairlineStrongBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{DynamicResource PanelCornerRadius}"
+                    Padding="14,11" IsVisible="False"
+                    HorizontalAlignment="Stretch">
+                <StackPanel Spacing="7">
+                    <TextBlock Text="标签（点击浏览该标签下的图片）"
+                               Theme="{StaticResource AppGroupHeader}" />
+                    <ScrollViewer MaxHeight="96" VerticalScrollBarVisibility="Auto">
+                        <WrapPanel x:Name="TagsList" Orientation="Horizontal" />
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+            <Border x:Name="Toolbar" Theme="{StaticResource AppFloatingToolbar}"
+                    CornerRadius="999" Padding="7,6"
+                    HorizontalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="1">
+                    <Button x:Name="PrevButton" Theme="{StaticResource AppIconButton}"
+                            Click="OnPrev" ToolTip.Tip="上一张（←）">
+                        <controls:FontIcon Glyph="&#xE76B;" FontSize="14" />
+                    </Button>
+                    <Border MinWidth="66" VerticalAlignment="Center">
+                        <TextBlock x:Name="IndexLabel" Text="1 / 1"
+                                   Theme="{StaticResource AppMonoStrong}"
+                                   HorizontalAlignment="Center" />
+                    </Border>
+                    <Button x:Name="NextButton" Theme="{StaticResource AppIconButton}"
+                            Click="OnNext" ToolTip.Tip="下一张（→）">
+                        <controls:FontIcon Glyph="&#xE76C;" FontSize="14" />
+                    </Button>
+                    <Border Width="1" Height="18" Margin="7,0" VerticalAlignment="Center"
+                            Background="{DynamicResource AppHairlineStrongBrush}" />
+                    <Border x:Name="WindowThumbBorder" Width="32" Height="32" CornerRadius="7"
+                            Background="{DynamicResource AppSurfaceSunkenBrush}"
+                            BorderBrush="{DynamicResource AppHairlineStrongBrush}"
+                            BorderThickness="1"
+                            VerticalAlignment="Center" Margin="0,0,4,0"
+                            IsVisible="False">
+                        <Image x:Name="WindowThumb" Stretch="UniformToFill" />
+                    </Border>
+                    <Button x:Name="SaveButton" Theme="{StaticResource AppIconButton}"
+                            Click="OnSave" ToolTip.Tip="保存">
+                        <controls:FontIcon Glyph="&#xE74E;" FontSize="14" />
+                    </Button>
+                    <Border Width="1" Height="18" Margin="7,0" VerticalAlignment="Center"
+                            Background="{DynamicResource AppHairlineStrongBrush}" />
+                    <Button x:Name="FullscreenButton" Theme="{StaticResource AppIconButton}"
+                            Click="OnToggleFullscreen" ToolTip.Tip="全屏（F11）">
+                        <controls:FontIcon Glyph="&#xE740;" FontSize="14" />
+                    </Button>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Grid>
+</Window>

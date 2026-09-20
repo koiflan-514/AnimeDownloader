@@ -1,0 +1,91 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        ============================================================================
+        原生控件的形状归位（全局 Style，不是控件主题）
+        ============================================================================
+
+        为什么这些必须单独成文件、且挂在 Application.Styles 下：
+        我们的**控件主题**（AppAccentButton / AppPanelBorder / …）都是带 x:Key 的
+        ControlTheme，属于「资源」，因此住在 Styles/AppStyles.axaml 这个
+        ResourceDictionary 里。而下面这些是**无 x:Key 的全局 Style**（按类型选择器
+        命中所有实例），ResourceDictionary 的 Content 只接受 KeyValuePair，
+        放进去会直接编译失败：
+
+            AVLN3000: Unable to find suitable setter or adder for property Content
+                      of type ResourceDictionary for argument Style
+
+        两者的语义也不同：资源是被显式引用的，全局 Style 是隐式生效的。
+        所以这里用 Styles 根，并在 App.axaml 的 Application.Styles 里排在
+        FluentTheme **之后**（后者压前者，样式顺序在 Avalonia 里是有意义的）。
+
+        Fluent 的中性色已经由 Styles/FluentOverrides.axaml 统一改写（实测
+        Application.Resources.MergedDictionaries 里的主题字典能压住 FluentTheme 的同名键）；
+        这里只补「形状」上的差异 —— 暗房用 7px 控件圆角，而 Fluent 默认更小。
+
+        动态状态不做 ControlTheme 重写：ComboBox / TextBox / NumericUpDown / ScrollBar
+        的 Fluent 模板牵一发动全身，重写它们的收益远小于风险，改形状与字号就够了。
+        （这几个颜色覆盖已经过运行期验证，不是推测。）
+    -->
+
+    <Style Selector="ComboBox">
+        <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontText}" />
+        <Setter Property="Padding" Value="11,0,0,0" />
+    </Style>
+    <Style Selector="TextBox">
+        <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontText}" />
+        <Setter Property="Padding" Value="10,5" />
+    </Style>
+    <Style Selector="NumericUpDown">
+        <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontMono}" />
+        <Setter Property="ShowButtonSpinner" Value="True" />
+        <Setter Property="ButtonSpinnerLocation" Value="Right" />
+    </Style>
+    <Style Selector="CheckBox">
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontText}" />
+        <!-- Fluent 的 CheckBox 基线模板带 MinHeight，会把设置页的紧凑勾选行撑高 -->
+        <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="ToggleSwitch">
+        <!-- 同上：基线 MinWidth 会把开关右侧的文字顶开 -->
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontText}" />
+    </Style>
+    <Style Selector="ProgressBar">
+        <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+        <Setter Property="MinHeight" Value="3" />
+    </Style>
+    <Style Selector="ToolTip">
+        <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
+        <Setter Property="Padding" Value="9,6" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontText}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Background" Value="{DynamicResource AppCardFillHoverBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppHairlineStrongBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AppTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="FlyoutPresenter">
+        <Setter Property="Background" Value="{DynamicResource AppPanelFillBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AppHairlineStrongBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource PanelCornerRadius}" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="ScrollViewer">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+</Styles>

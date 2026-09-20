@@ -1,0 +1,127 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:AnimeDownloader.App.Controls"
+             x:Class="AnimeDownloader.App.Controls.ImageCard"
+             Focusable="True"
+             HorizontalAlignment="Center"
+             VerticalAlignment="Center"
+             AutomationProperties.Name="图片卡片">
+
+    <!--
+        相纸（Plate）
+        ============================================================================
+        一张卡片 = 一张放在暗房台面上的相纸。默认状态几乎看不见「控件」：
+        只有一层比房间略亮的表面 + 一条 1px 极细线，让图片本身成为唯一焦点。
+        悬停时才浮现：整卡内描边提亮（HoverActions 里的全幅层）+ 打开/保存两枚快捷按钮。
+        元数据（作者、分辨率）一律等宽小字 —— 与画廊页脚、命令条同一套排版语言。
+
+        尺寸：宽高由 GalleryPage 的 UpdateGridLayout 显式 SetCardSize（= 瓦片 − 10px 间隙），
+        这里用 Center 对齐让它在瓦片里居中 —— 相邻两张之间就自然留出 10px 栏距。
+        悬停放大 1.04 也正好吃这点余量，不会顶到邻居。
+
+        —— 两层变换，各自独立 ——
+        CardRoot  ：悬停缩放（0.16s）。**不能**带入场延迟，否则鼠标一上去要等半秒才放大。
+        CardVisual：入场（透明度 + 上移 14px，0.32s，逐卡错峰）。
+        分两层是因为两者的时长与延迟完全不同；合成一层就会互相污染。
+
+        —— Avalonia 没有 Storyboard ——
+        WinUI 版用 Storyboard 手工驱动 DoubleAnimation。Avalonia 里：
+          · 悬停缩放用 TransformOperations + Transition（XAML 声明，见 CardRoot.Transitions）。
+          · 入场用代码创建的 Transitions（因为延迟逐卡不同，静态 XAML 表达不了）。
+          · 微光扫过用 Animation + KeyFrame（无限循环），见 ImageCard.axaml.cs。
+    -->
+    <Grid x:Name="CardRoot" RenderTransformOrigin="0.5,0.5">
+        <Grid.Transitions>
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.16">
+                    <TransformOperationsTransition.Easing>
+                        <!-- Avalonia 12 没有 EasingMode，缓动按方向拆成一族类 -->
+                        <CubicEaseOut />
+                    </TransformOperationsTransition.Easing>
+                </TransformOperationsTransition>
+            </Transitions>
+        </Grid.Transitions>
+
+        <Grid x:Name="CardVisual">
+            <Border x:Name="CardBorder" Theme="{StaticResource AppCardBorder}">
+                <Grid x:Name="CardContent" ClipToBounds="True">
+                    <!-- 微光占位层：极低对比的一道光，只提示「正在显影」，不闪烁 -->
+                    <Border x:Name="ShimmerHost" CornerRadius="11"
+                            Background="{DynamicResource AppTrackFillBrush}">
+                        <Border x:Name="ShimmerSlide" Width="360" HorizontalAlignment="Left"
+                                Background="{DynamicResource AppShimmerBrush}" />
+                    </Border>
+
+                    <Image x:Name="Thumb" Stretch="UniformToFill" IsVisible="False" />
+
+                    <!-- 底部作者：等宽宽字距小字，压在一条只到一半就散掉的渐变上 -->
+                    <Border x:Name="ArtistScrim" VerticalAlignment="Bottom" Height="52"
+                            Background="{DynamicResource AppScrimBrush}"
+                            CornerRadius="0,0,11,11"
+                            IsVisible="False">
+                        <TextBlock x:Name="ArtistText"
+                                   FontFamily="{DynamicResource AppFontMono}"
+                                   FontSize="10.5"
+                                   LetterSpacing="0.63"
+                                   Foreground="#FFF0F1F3"
+                                   MaxLines="1"
+                                   Padding="11,0,80,9"
+                                   VerticalAlignment="Bottom"
+                                   TextTrimming="CharacterEllipsis" />
+                    </Border>
+
+                    <!--
+                        悬浮层：整卡内描边 + 右下角快捷操作。
+                        代码只驱动这一层的 IsVisible，所以「整卡提亮」与「按钮浮现」天然同步。
+                    -->
+                    <Grid x:Name="HoverActions" IsVisible="False">
+                        <!-- 全幅内描边：灯从上方照下来，纸的边缘先亮起来 -->
+                        <Border CornerRadius="11" BorderThickness="1"
+                                BorderBrush="{DynamicResource AppAccentLineBrush}"
+                                IsHitTestVisible="False" />
+                        <StackPanel Orientation="Horizontal" Spacing="5"
+                                    HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                    Margin="0,0,9,9">
+                            <Button x:Name="OpenButton" Theme="{StaticResource AppOverlayIconButton}"
+                                    Click="OnOpenClick"
+                                    ToolTip.Tip="打开大图（双击 / 回车）">
+                                <controls:FontIcon Glyph="&#xE768;" FontSize="12" />
+                            </Button>
+                            <Button x:Name="SaveButton" Theme="{StaticResource AppOverlayIconButton}"
+                                    Click="OnQuickSave"
+                                    ToolTip.Tip="保存到下载目录">
+                                <controls:FontIcon Glyph="&#xE74E;" FontSize="12" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- 分辨率：深色玻璃 + 等宽，属于「读数」而不是装饰 -->
+                    <Border x:Name="ResBadge" HorizontalAlignment="Right" VerticalAlignment="Top"
+                            Margin="0,9,9,0" IsVisible="False"
+                            CornerRadius="5" Background="#99070809" Padding="6,2">
+                        <TextBlock x:Name="ResText"
+                                   FontFamily="{DynamicResource AppFontMono}"
+                                   FontSize="10"
+                                   LetterSpacing="0.2"
+                                   Foreground="#FFE6E8EB" />
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- 加载失败覆盖层 -->
+            <Border x:Name="ErrorOverlay"
+                    Theme="{StaticResource AppCardBorder}"
+                    CornerRadius="11"
+                    IsVisible="False">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6">
+                    <controls:FontIcon Glyph="&#xE7BA;" FontSize="20"
+                                       Foreground="{DynamicResource AppTextQuaternaryBrush}"
+                                       HorizontalAlignment="Center" />
+                    <TextBlock x:Name="ErrorText" Text="加载失败" FontSize="11"
+                               HorizontalAlignment="Center"
+                               Foreground="{DynamicResource AppTextTertiaryBrush}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

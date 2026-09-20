@@ -2,41 +2,53 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
-    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
-    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <!--
+      跨平台目标框架：Core 是纯 net10.0 类库，Avalonia 也按平台中立的方式引用。
+      Windows 专属能力（强调色注册表、DWM 标题栏着色、全屏呈现器）全部由
+      Platform/ 下的服务在 OperatingSystem.IsWindows() 分支里提供。
+    -->
+    <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>AnimeDownloader.App</RootNamespace>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>..\icons\AnimeDownloader.ico</ApplicationIcon>
+    <AssemblyName>AnimeDownloader</AssemblyName>
+    <!--
+      图标在**仓库根**的 icons/ 下，而本文件在 src/AnimeDownloader.App/ ——
+      因此是两级上跳（..\..\icons）。(原写法是 ..\icons，指向不存在的 src/icons，
+      Avalonia 的资源生成任务会在构建早期直接抛 FileNotFoundException。)
+    -->
+    <ApplicationIcon>..\..\icons\AnimeDownloader.ico</ApplicationIcon>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <Platforms>x64;x86;ARM64</Platforms>
-    <RuntimeIdentifiers>win-x64;win-x86;win-arm64</RuntimeIdentifiers>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <UseWinUI>true</UseWinUI>
-    <EnableMsixTooling>true</EnableMsixTooling>
-    <WindowsPackageType>None</WindowsPackageType>
-    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <RuntimeIdentifiers>win-x64;win-x86;win-arm64;linux-x64;osx-x64;osx-arm64</RuntimeIdentifiers>
+    <!--
+      AVLN3001：「该 XAML 资源无法被**运行期加载器**反射实例化，因为没有公开的无参构造」。
+      唯一命中它的是 Controls/GalleryViewerWindow.axaml —— 那个窗口的依赖（所属主窗、
+      图集、起始序号）是**必需**的，给它加公开无参构造只会造出一个半成品对象，
+      比留着这条警告更糟（运行期加载器我们都用不到：全部 XAML 都走编译期路径）。
+      因此按「已知且有意为之」精确压制，而不是改设计去迎合告警。
+    -->
+    <NoWarn>$(NoWarn);AVLN3001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260710003" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.8249" />
+    <PackageReference Include="Avalonia" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.2" />
   </ItemGroup>
 
+  <!--
+    Avalonia.Diagnostics（F12 调试面板）在 12.1.2 这一档**没有发布对应的包版本**
+    （nuget.org 上最新只到 11.3.x），引它会让整个 restore 直接失败（NU1102）。
+    本项目也不需要它：验证走的是「跑起来 + 截图 + 像素探针」那条路，不靠 DevTools。
+  -->
   <ItemGroup>
     <ProjectReference Include="..\AnimeDownloader.Core\AnimeDownloader.Core.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Remove="Assets\**" />
-    <Content Include="Assets\**" />
-  </ItemGroup>
-
   <!-- 应用图标：嵌入 exe（ApplicationIcon）并复制到输出目录供窗口图标使用 -->
   <ItemGroup>
-    <Content Include="..\icons\AnimeDownloader.ico" Link="AnimeDownloader.ico" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="..\icons\AnimeDownloader.png" Link="AnimeDownloader.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\icons\AnimeDownloader.ico" Link="AnimeDownloader.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\icons\AnimeDownloader.png" Link="AnimeDownloader.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

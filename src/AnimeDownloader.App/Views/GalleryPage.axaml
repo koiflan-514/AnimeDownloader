@@ -1,0 +1,254 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:AnimeDownloader.App.Controls"
+             xmlns:automation="using:Avalonia.Automation"
+             x:Class="AnimeDownloader.App.Views.GalleryPage"
+             Focusable="True"
+             automation:AutomationProperties.Name="灵感画廊">
+
+    <!--
+        画廊 = 接触印相（Contact Sheet）
+        ============================================================================
+        旧版把「标题 / 页码 / 标签 / 工具栏」摞成三条并排的功能条，视觉重量全在边缘，
+        中间那张网格反而最轻。
+        新版按印刷厂的接触印相来处理：
+            上方只有「眉标 + 标题 + 一行说明」，一条细线切开，接着是筛选行。
+            翻页、批量下载、进度这些「关于这一批」的操作全部下放到页脚轨道。
+            中间留给图片，先看画，再谈操作。
+
+        —— 与 WinUI 版的两处结构性替换 ——
+        1. <c>GridView</c>（含 ItemsWrapGrid / IsItemClickEnabled / ItemClick）不存在，
+           改成 <c>ScrollViewer</c> + <c>TileWrapPanel</c>：瓦片尺寸仍由 UpdateGridLayout
+           按视口宽度重算，「卡片 = 瓦片 − 栏距并居中」的算法原样成立；
+           「点卡片打开大图」从 GridView.ItemClick 下移到 ImageCard 自己的 PointerPressed。
+        2. <c>ItemsWrapGrid.ItemWidth/ItemHeight</c> 换成 TileWrapPanel 的同名属性 ——
+           TileWrapPanel 就是照着 ItemsWrapGrid 的测量语义写的（给子元素恰好
+           一个瓦片的槽位，由子元素自己决定在槽位里怎么摆），栏距因此不会被吞掉。
+    -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!--
+            标签联想弹层：复选框多选智能提示（含中文译名 / 热度 / 类别 / 相关标签）
+
+            定位方式与 WinUI 版不同，而且是**更好**的那种：
+            WinUI 的 Popup 只接受 HorizontalOffset/VerticalOffset（相对「父容器内容原点 +
+            自身布局槽位」，语义含混，且槽位原点里已经含了前面兄弟元素的高度 ——
+            项目里为此栽过一次，弹层整体下移两百余像素）。
+            Avalonia 的 Popup 有 PlacementTarget + Placement，直接声明「贴在标签输入框
+            下沿左对齐」即可，不需要任何坐标运算，也不会因为头部改版而失准。
+            仍放在根容器的首位：Popup 的 DesiredSize 为 0，落在第 0 行不会撑高行高。
+        -->
+        <Popup x:Name="TagSuggestPopup"
+               Placement="BottomEdgeAlignedLeft"
+               IsLightDismissEnabled="True">
+            <Border Background="{DynamicResource AppCardFillBrush}"
+                    BorderBrush="{DynamicResource AppHairlineStrongBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{DynamicResource PanelCornerRadius}"
+                    Width="460" MaxHeight="400" Padding="10">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="6" MinWidth="436">
+                        <TextBlock x:Name="SuggestHeaderText"
+                                   Text="标签联想（勾选加入搜索）"
+                                   Theme="{StaticResource AppGroupHeader}" Margin="4,2" />
+                        <StackPanel x:Name="SuggestList" Spacing="1" />
+                        <TextBlock x:Name="RelatedHeaderText" Text="相关标签"
+                                   Theme="{StaticResource AppGroupHeader}" Margin="4,10,4,2"
+                                   IsVisible="False" />
+                        <StackPanel x:Name="RelatedList" Spacing="1" />
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Popup>
+
+        <!-- ============ 头部：眉标 / 标题 / 筛选 ============ -->
+        <StackPanel Grid.Row="0" Margin="28,22,28,0">
+            <Grid ColumnSpacing="16" ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="5">
+                    <TextBlock Text="接触印相" Theme="{StaticResource AppEyebrow}" />
+                    <TextBlock Text="灵感画廊" Theme="{StaticResource AppDisplayText}" />
+                    <TextBlock x:Name="GalleryHint" Theme="{StaticResource AppHintText}"
+                               TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                               MaxWidth="620" HorizontalAlignment="Left" />
+                </StackPanel>
+            </Grid>
+
+            <Border Height="1" Background="{DynamicResource AppHairlineBrush}" Margin="0,18,0,0" />
+
+            <!-- 筛选行：标签搜索 + 两个模式开关（窄窗口横向滚动，不挤压） -->
+            <ScrollViewer Margin="0,14,0,16"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Disabled">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Border x:Name="TagSearchHost"
+                            Background="{DynamicResource AppSurfaceSunkenBrush}"
+                            BorderBrush="{DynamicResource AppHairlineBrush}"
+                            BorderThickness="1"
+                            CornerRadius="{DynamicResource ControlCornerRadius}"
+                            Padding="2"
+                            IsVisible="False">
+                        <Grid ColumnSpacing="2" ColumnDefinitions="Auto,236,Auto">
+                            <controls:FontIcon Glyph="&#xE721;" FontSize="12"
+                                               Foreground="{DynamicResource AppTextTertiaryBrush}"
+                                               VerticalAlignment="Center" Margin="8,0,2,0" />
+                            <TextBox x:Name="TagBox" Grid.Column="1" BorderThickness="0"
+                                     Background="Transparent" FontSize="12.5"
+                                     PlaceholderText="输入标签搜索（回车应用）"
+                                     VerticalAlignment="Center"
+                                     KeyDown="OnTagBoxKeyDown"
+                                     TextChanged="OnTagBoxTextChanged" />
+                            <Button x:Name="TagApplyButton" Grid.Column="2"
+                                    Theme="{StaticResource AppSmallIconButton}"
+                                    Click="OnTagApply"
+                                    ToolTip.Tip="应用标签并刷新">
+                                <controls:FontIcon Glyph="&#xE896;" FontSize="12" />
+                            </Button>
+                        </Grid>
+                    </Border>
+
+                    <Border x:Name="TagChip"
+                            Background="{DynamicResource AppAccentSoftBrush}"
+                            BorderBrush="{DynamicResource AppAccentLineBrush}"
+                            BorderThickness="1"
+                            CornerRadius="{DynamicResource PillCornerRadius}"
+                            Padding="9,3"
+                            VerticalAlignment="Center"
+                            IsVisible="False">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock x:Name="TagChipText" FontSize="11"
+                                       FontFamily="{DynamicResource AppFontMono}"
+                                       Foreground="{DynamicResource AppTextPrimaryBrush}"
+                                       VerticalAlignment="Center" MaxWidth="260"
+                                       TextTrimming="CharacterEllipsis" />
+                            <Button x:Name="ClearTagButton" Theme="{StaticResource AppSmallIconButton}"
+                                    Width="18" Height="18" Padding="0" Click="OnClearTag"
+                                    ToolTip.Tip="清除标签">
+                                <controls:FontIcon Glyph="&#xE711;" FontSize="9" />
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Width="1" Height="18" Background="{DynamicResource AppHairlineStrongBrush}"
+                            VerticalAlignment="Center" Margin="4,0" />
+
+                    <ToggleButton x:Name="ModeToggle" Content="随机模式"
+                                  Theme="{StaticResource AppSegmentToggle}"
+                                  Click="OnModeToggleClick"
+                                  ToolTip.Tip="每页随机抽取，而不是按顺序翻页" />
+                    <ToggleButton x:Name="AutoReloadToggle" Content="自动刷新"
+                                  Theme="{StaticResource AppSegmentToggle}"
+                                  Click="OnAutoReloadClick"
+                                  ToolTip.Tip="按设定间隔自动重新加载" />
+                </StackPanel>
+            </ScrollViewer>
+        </StackPanel>
+
+        <!-- ============ 印相网格 ============ -->
+        <Grid Grid.Row="1" Margin="28,0,28,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <!--
+                    瓦片尺寸由 UpdateGridLayout 按视口宽度重算（值 = 卡片 + 10px 间隙）；
+                    ItemWidth/ItemHeight 的初值只是首帧的合理默认，避免第一帧出现 180 的旧节奏。
+                -->
+                <controls:TileWrapPanel x:Name="ThumbPanel" ItemWidth="248" ItemHeight="248"
+                                        SizeChanged="OnGridSizeChanged" />
+            </ScrollViewer>
+
+            <!-- 空状态：不是一句「暂无数据」，而是告诉人下一步做什么 -->
+            <StackPanel x:Name="EmptyStatePanel" IsVisible="False"
+                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Spacing="12" MaxWidth="400">
+                <Border Width="52" Height="52" CornerRadius="14"
+                        Background="{DynamicResource AppSurfaceSunkenBrush}"
+                        BorderBrush="{DynamicResource AppHairlineBrush}"
+                        BorderThickness="1"
+                        HorizontalAlignment="Center">
+                    <controls:FontIcon Glyph="&#xE91B;" FontSize="22"
+                                       Foreground="{DynamicResource AppTextTertiaryBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock x:Name="EmptyTitle" Text="暂无图片"
+                           Theme="{StaticResource AppCardTitleText}"
+                           FontSize="15" HorizontalAlignment="Center" />
+                <TextBlock x:Name="EmptyMessage" Theme="{StaticResource AppBodyText}"
+                           TextAlignment="Center" HorizontalAlignment="Center" />
+                <Button x:Name="EmptyActionButton" Content="换一批看看"
+                        Theme="{StaticResource AppPillButton}"
+                        HorizontalAlignment="Center" Click="OnRetry"
+                        IsVisible="False" />
+            </StackPanel>
+
+            <controls:InfoBar x:Name="WelcomeBar" Theme="{StaticResource AppInfoBar}"
+                              IsOpen="False" IsClosable="True"
+                              Severity="Informational"
+                              Title="从这里开始"
+                              Message="选择图源后点刷新即可浏览；单击卡片选中，双击看大图并保存，页脚可批量下载。"
+                              Closed="OnWelcomeBarClosed"
+                              VerticalAlignment="Bottom" Margin="0,0,0,10">
+                <controls:InfoBar.ActionContent>
+                    <Button Content="了解设置" Click="OnOpenSettings" />
+                </controls:InfoBar.ActionContent>
+            </controls:InfoBar>
+        </Grid>
+
+        <!-- ============ 页脚轨道：本批次的进度 + 翻页 + 批量下载 ============ -->
+        <Border Grid.Row="2" Theme="{StaticResource AppStatusBar}"
+                Height="48" Padding="20,0,16,0">
+            <Grid ColumnSpacing="12" ColumnDefinitions="Auto,*,Auto">
+
+                <!-- 左：这一批的状态 -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="9"
+                            VerticalAlignment="Center">
+                    <Ellipse x:Name="StatusDot" Theme="{StaticResource AppStatusDot}"
+                             VerticalAlignment="Center" />
+                    <controls:ProgressRing x:Name="LoadingRing"
+                                           Theme="{StaticResource AppProgressRing}"
+                                           Width="15" Height="15"
+                                           IsActive="False" VerticalAlignment="Center" />
+                    <TextBlock x:Name="StatusText" Text="就绪"
+                               Theme="{StaticResource AppCaptionText}"
+                               MaxWidth="420" />
+                    <ProgressBar x:Name="BatchProgress" Width="132"
+                                 IsVisible="False" Minimum="0" Maximum="1" Value="0"
+                                 VerticalAlignment="Center" />
+                </StackPanel>
+
+                <!-- 右：页序与整批操作 -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8"
+                            VerticalAlignment="Center">
+                    <Button x:Name="RetryButton" Content="重试"
+                            Theme="{StaticResource AppPillButton}"
+                            IsVisible="False" Click="OnRetry" />
+                    <Button x:Name="CancelBatchButton" Content="取消"
+                            Theme="{StaticResource AppPillButton}"
+                            IsVisible="False" Click="OnCancelBatch" />
+                    <TextBlock x:Name="PageLabel" Text="第 1 页"
+                               Theme="{StaticResource AppMonoStrong}"
+                               Margin="6,0,2,0" />
+                    <Button x:Name="PrevPageButton" Theme="{StaticResource AppIconButton}"
+                            Click="OnPrevPage" ToolTip.Tip="上一页（←）">
+                        <controls:FontIcon Glyph="&#xE76B;" FontSize="13" />
+                    </Button>
+                    <Button x:Name="NextPageButton" Theme="{StaticResource AppIconButton}"
+                            Click="OnNextPage" ToolTip.Tip="下一页（→）">
+                        <controls:FontIcon Glyph="&#xE76C;" FontSize="13" />
+                    </Button>
+                    <Button x:Name="DownloadAllButton" MinWidth="112"
+                            Theme="{StaticResource AppAccentButton}"
+                            Click="OnDownloadAll" ToolTip.Tip="下载当前页全部图片">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <controls:FontIcon Glyph="&#xE896;" FontSize="12" />
+                            <TextBlock Text="下载全部" TextTrimming="None" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

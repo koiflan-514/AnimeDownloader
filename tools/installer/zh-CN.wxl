@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<WixLocalization Culture="zh-cn" Language="2052" Codepage="936"
-                 xmlns="http://wixtoolset.org/schemas/v4/wxl">
-    <!-- 覆盖 WiX UI 扩展内置的中文文案，使其更贴近普通用户。 -->
-    <String Id="ExitDialogDescription" Overridable="yes"
-            Value="AnimeDownloader 已安装完成。&#10;&#10;需要卸载时，请打开“设置 → 应用 → 已安装的应用”（或“控制面板 → 程序和功能”），找到 AnimeDownloader 后单击“卸载”。" />
-</WixLocalization>
