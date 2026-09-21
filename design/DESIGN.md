@@ -299,6 +299,19 @@
 
 **焦点可见性**：所有自定义模板都设 `UseSystemFocusVisuals="False"`，改用模板内的 2px `AppFocusRingBrush` 焦点环（`FocusStates` 组）。注意实心强调色块上的焦点环要改用 `AppAccentInkBrush` —— 否则强调色环压在强调色块上会完全看不见。
 
+**图标码位必须对着官方名字表核（`FontIcon` 的四个真实笔误）**：本项目的图标全是 `Segoe Fluent Icons` 私用区（PUA）字形，码位本身不带语义 —— 写错一个数字，**不报错、不缺字形、布局也正常**，只是画的不是那个东西。把全部在用码位逐个对照官方表后查出四处：
+
+| 用途 | 原码位 | 官方名 | 实际画的是 | 现用 |
+|---|---|---|---|---|
+| 拉伸填充 | `E78F` | **不存在** | 空白（Windows 上也空白） | `E799` AspectRatio |
+| 缩小 | `E8A2` | AttachCamera | 一台相机 | `E71F` ZoomOut |
+| 适应屏幕 | `E7C3` | Page | 一张文档 | `E9A6` FitPage |
+| 实际大小 | `E738` | Remove | 一根短横线 | 等宽文字 `1:1` |
+
+两条纪律：① **只看「有没有字形」不够**，必须把字形渲染出来看语义 —— 前两处「字形存在」的检查全绿；② 「实际大小」没有再挑码位，因为 Segoe 里没有该语义的字形（`E71E` Zoom 是放大镜加号，会与放大重复），改用等宽数字零歧义、也合「所有数字走等宽」。官方对照表：<https://learn.microsoft.com/en-us/windows/apps/design/style/segoe-fluent-icons-font>。
+
+> 另注意 `Segoe Fluent Icons` 与 `Segoe MDL2 Assets` 有少量码位不重合，两张表要以官方表为准；字体文件的 `post` 表是 3.0 格式，**从文件里读不到字形名**。avalonia 分支把这份码位纪律与跨平台兜底字体一起落在 `design/DESIGN.md` §3。
+
 ---
 
 ## 7. 动效与交互反馈
