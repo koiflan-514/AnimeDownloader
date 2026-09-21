@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  启动图标的前景：暗房的「落到托盘里的箭头」。
+  画在 108×108 的视口里、图形只占中间 72×72 —— 这是自适应图标的规矩：
+  外围 18dp 随时可能被各家的形状遮罩切掉，任何有意义的笔画都不能放进去。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+  <!-- 箭杆 + 箭头（居中，占 40×40） -->
+  <path
+      android:fillColor="#FFEDEEF1"
+      android:pathData="M50,32h8v22h10L54,72L40,54h10z" />
+  <!-- 托盘底线 -->
+  <path
+      android:fillColor="#FFEDEEF1"
+      android:pathData="M38,76h32v5H38z" />
+</vector>

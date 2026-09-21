@@ -1,42 +1,47 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
-    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
-    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <!--
+      最低支持 Android 7.0（API 24）：覆盖面足够，且避开 API 21-23 上 MediaStore、
+      通知渠道、分区存储的若干行为差异。
+      必须写在这里而不是 Directory.Build.props —— 原因见那份文件里的说明（求值顺序）。
+    -->
+    <SupportedOSPlatformVersion>24.0</SupportedOSPlatformVersion>
+
     <RootNamespace>AnimeDownloader.App</RootNamespace>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>..\icons\AnimeDownloader.ico</ApplicationIcon>
-    <Platforms>x64;x86;ARM64</Platforms>
-    <RuntimeIdentifiers>win-x64;win-x86;win-arm64</RuntimeIdentifiers>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <UseWinUI>true</UseWinUI>
-    <EnableMsixTooling>true</EnableMsixTooling>
-    <WindowsPackageType>None</WindowsPackageType>
-    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <AssemblyName>AnimeDownloader</AssemblyName>
+
+    <ApplicationId>com.koiflan.animedownloader</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>$(Version)</ApplicationDisplayVersion>
+
+    <!--
+      只保留三种 ABI：arm64（现役手机全部）、arm（老旧设备）、x64（模拟器 / Chromebook）。
+      去掉 x86 —— 那类设备基本只剩十年前的平板，留着它只会让 APK 变大、安装变慢。
+    -->
+    <RuntimeIdentifiers>android-arm64;android-arm;android-x64</RuntimeIdentifiers>
+
+    <!-- Release 用 SDK 程序集级别的裁剪；Full 会误裁掉反射用到的绑定类型。 -->
+    <AndroidLinkMode Condition="'$(Configuration)' == 'Release'">SdkOnly</AndroidLinkMode>
+    <AndroidEnableProfiledAot Condition="'$(Configuration)' == 'Release'">true</AndroidEnableProfiledAot>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260710003" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.8249" />
+    <!--
+      唯一的第三方依赖。选它的理由只有一个：**网格回收**。
+      android.widget.GridView 虽然也回收视图，但在「列数随屏幕宽度动态变化」时
+      要么重建适配器要么出现复用错位，而「加载性能优化」正是本项目明确的目标之一。
+      RecyclerView 是这条需求的平台标准解法，且它只依赖 AndroidX.Core/Annotation/Collection，
+      不会再拖进 AppCompat 或 Material 那一整套主题体系。
+    -->
+    <PackageReference Include="Xamarin.AndroidX.RecyclerView" Version="1.4.0.6" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\AnimeDownloader.Download\AnimeDownloader.Download.csproj" />
     <ProjectReference Include="..\AnimeDownloader.Core\AnimeDownloader.Core.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Remove="Assets\**" />
-    <Content Include="Assets\**" />
-  </ItemGroup>
-
-  <!-- 应用图标：嵌入 exe（ApplicationIcon）并复制到输出目录供窗口图标使用 -->
-  <ItemGroup>
-    <Content Include="..\icons\AnimeDownloader.ico" Link="AnimeDownloader.ico" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="..\icons\AnimeDownloader.png" Link="AnimeDownloader.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

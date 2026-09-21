@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  下载模块自己声明的权限与组件。
+
+  .NET for Android 的**库工程会把自己的清单合并进宿主应用**，所以模块的依赖边界
+  在这里是自证的：宿主应用不需要记得再补哪条权限，引用这个库就自动带上。
+  （<service> 节点由 DownloadForegroundService 上的 [Service] 特性生成，不在这里重复写。）
+
+  逐条说明「为什么需要」：
+    INTERNET                       —— 下载图片。
+    ACCESS_NETWORK_STATE           —— 判断当前是不是计费网络 / 有没有网。缺了它
+                                       RegisterDefaultNetworkCallback 会抛 SecurityException，
+                                      「仅 Wi-Fi」这个开关直接失效。
+    WAKE_LOCK                      —— 传输期间挂一把 PARTIAL_WAKE_LOCK，让锁屏后 CPU 不停摆。
+    FOREGROUND_SERVICE             —— 前台服务的入场券（API 28+）。
+    FOREGROUND_SERVICE_DATA_SYNC   —— API 34+ 起，前台服务必须声明**类型**并持有对应权限；
+                                      dataSync 是「下载/上传」这一类的官方归类。
+    POST_NOTIFICATIONS             —— API 33+ 的通知运行时权限。没授权时模块会静默降级
+                                      （下载照常，只是没有进度通知）。
+    WRITE_EXTERNAL_STORAGE         —— 仅 API 28 及以下需要：那时还没有分区存储，
+                                      写公共 Pictures 目录必须走这条权限。加了 maxSdkVersion
+                                      之后，Android 10+ 不会再申请，系统也不会给。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <uses-permission
+      android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+      android:maxSdkVersion="28" />
+
+</manifest>

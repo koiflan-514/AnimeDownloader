@@ -13,6 +13,24 @@
     <Copyright>(c) 2026 AnimeDownloader contributors</Copyright>
   </PropertyGroup>
 
+  <!--
+    Android SDK 位置：本机走默认安装路径，显式写出便于他人复现。
+    （纯属性，桌面目标读不读都无副作用。）
+  -->
+  <PropertyGroup>
+    <AndroidSdkDirectory Condition="'$(AndroidSdkDirectory)' == '' AND Exists('$(LocalAppData)\Android\Sdk')">$(LocalAppData)\Android\Sdk</AndroidSdkDirectory>
+  </PropertyGroup>
+
+  <!--
+    这里**不能**放 Android 专属的构建属性（例如 SupportedOSPlatformVersion）。
+    本文件在项目正文**之前**求值，那一刻 $(TargetFramework) 还是空的，
+    于是 Condition 里比较 net10.0-android 永远为假、属性被静默丢弃 —— 没有任何警告。
+    症状很隐蔽：CA1416 认为最低版本是 21，于是所有 API 23+ 的调用都被判成「越级」，
+    而 SDK 那边又仍然按 24 打包。
+
+    最低支持 Android 7.0（API 24）这条声明因此写在两个 Android 工程的 csproj 里。
+  -->
+
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
     <DebugType>full</DebugType>
     <DebugSymbols>true</DebugSymbols>

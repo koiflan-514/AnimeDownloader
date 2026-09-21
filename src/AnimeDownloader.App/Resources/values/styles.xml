@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  应用主题。刻意**只**基于 android:Theme.Material.NoActionBar，不引 AppCompat、不引 Material。
+
+  理由：这套界面的观感由「暗房」令牌（表面色阶 + 1px 极细线 + 等宽数字 + 系统强调色）决定，
+  原生控件的外观我们全程自己画。挂上一整套 Material 主题只会带来两件事：
+  多一层要覆盖的默认值，以及一个必然会漏出来的、与设计语言无关的默认配色。
+-->
+<resources>
+
+  <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+    <!-- 第一帧的底色：避免启动瞬间闪白 -->
+    <item name="android:windowBackground">@color/dk_window_background</item>
+
+    <!-- 强调色兜底。API 31 以下用它，31+ 由 DkAccent 从系统的动态色里取真值。 -->
+    <item name="android:colorAccent">@color/dk_accent_fallback</item>
+    <item name="android:colorPrimary">@color/dk_window_background</item>
+    <item name="android:colorPrimaryDark">@color/dk_window_background</item>
+    <item name="android:colorControlNormal">#FF9AA0AB</item>
+
+    <!-- 边到边：系统栏交给我们自己画，于是内容可以延伸到状态栏与手势条下方。
+         API 35 起这是强制行为，提前在低版本上做同一件事，行为才一致。 -->
+    <item name="android:statusBarColor">@android:color/transparent</item>
+    <item name="android:navigationBarColor">@android:color/transparent</item>
+    <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+    <item name="android:windowLightStatusBar">false</item>
+  </style>
+
+</resources>

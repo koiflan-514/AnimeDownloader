@@ -16,10 +16,6 @@ artifacts/
 TestResults/
 [Tt]est[Rr]esult*/
 
-# Windows App SDK / packaged app output
-AppPackages/
-BundleArtifacts/
-
 # NuGet
 *.nupkg
 *.snupkg
@@ -34,12 +30,18 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
-# Reasonix
-.reasonix/
+# Android / .NET for Android
+.gradle/
+local.properties
+*.apk
+*.aab
+*.idsig
+*.keystore
+*.jks
+captures/
+# Fast Deployment 的临时程序集目录（只在本机存在）
+.__override__/
 
 # 安装包构建产物
 publish/
-tools/installer/bin/
-tools/installer/obj/
-tools/installer/*.wixpdb
 .mimosa/

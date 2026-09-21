@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  只放**窗口本身**需要的颜色。界面上的一切颜色都由运行期的暗房令牌（Design/Dk.cs）决定，
+  因为强调色必须跟随系统 —— 那是运行期才知道的值，写不进 XML。
+
+  这里的三条是「第一帧」用的：窗口在界面画出来之前就已经是深色，
+  否则从点图标到首帧之间会闪一下白，是这类深色应用最容易露馅的地方。
+-->
+<resources>
+  <color name="dk_window_background">#FF0D0E11</color>
+  <color name="dk_rail_background">#FF0A0B0D</color>
+  <!-- 强调色兜底：Windows 默认强调色。API 31 以下由它顶上，31+ 读的是系统的动态强调色。 -->
+  <color name="dk_accent_fallback">#FF0078D4</color>
+</resources>

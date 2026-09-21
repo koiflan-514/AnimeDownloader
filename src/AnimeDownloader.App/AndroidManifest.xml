@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  应用级清单。
+
+  这里是**故意**空的 —— 下载模块那份 AndroidManifest.xml 已经声明了自己需要的全部权限，
+  而 .NET for Android 的库清单会自动合并进宿主应用。所以「引用这个库就自动带上权限」
+  这件事是被构建系统保证的，应用这边不需要记得补。想看这个应用最终要了哪些权限，
+  看 src/AnimeDownloader.Download/AndroidManifest.xml 一份就够。
+
+  Activity / Application 也不在这里注册：它们各自用 [Activity] / [Application] 特性声明，
+  清单里的重复登记反而是两处真相。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+</manifest>

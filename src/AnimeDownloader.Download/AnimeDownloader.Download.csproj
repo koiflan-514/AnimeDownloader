@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      双目标不是「顺便支持桌面」的炫技，而是把这个模块的**契约层**与**平台层**分开验证：
+
+        · net10.0        —— 只编译 Contracts/（落点抽象、规划、策略）。这些是纯决策代码，
+                           没有 Android 类型，于是可以在普通桌面测试工程里直接断言。
+        · net10.0-android —— 编译全部，包含 MediaStore / 前台服务 / 通知 / 网络回调。
+
+      这样「文件名怎么净化」「低配机型该开几条连接」「空间不够时该不该拦」
+      这几条真正容易写错的规则，就不必靠真机试错来验证了。
+    -->
+    <TargetFrameworks>net10.0;net10.0-android</TargetFrameworks>
+    <!-- 与 App 工程保持一致，见那份 csproj 里的说明。 -->
+    <SupportedOSPlatformVersion Condition="'$(TargetFramework)' == 'net10.0-android'">24.0</SupportedOSPlatformVersion>
+    <RootNamespace>AnimeDownloader.Download</RootNamespace>
+    <AssemblyName>AnimeDownloader.Download</AssemblyName>
+  </PropertyGroup>
+
+  <!-- 桌面目标：把 Android 平台层整个排除，只留契约层 -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <Compile Remove="Android\**\*.cs" />
+  </ItemGroup>
+
+  <!-- Android 资源（通知小图标的矢量剪影）随库合并进宿主应用 -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-android'">
+    <AndroidResource Include="Resources\drawable\ic_download.xml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AnimeDownloader.Core\AnimeDownloader.Core.csproj" />
+  </ItemGroup>
+
+</Project>

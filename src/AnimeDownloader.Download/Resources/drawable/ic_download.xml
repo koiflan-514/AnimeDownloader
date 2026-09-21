@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  通知栏小图标：一支「落到托盘里的箭头」，自绘，不引用任何第三方图标集。
+
+  两条硬约束决定了它的写法：
+    1. 通知的小图标必须是**单色剪影** —— 系统只取 alpha 通道，把它整块染成白或黑。
+       彩色图会被渲染成一坨方块，所以这里只有一个 fillColor。
+    2. 必须来自**本应用自己的资源**。用 android.R.drawable.* 的系统图标在部分 OEM
+       定制系统上会被替换成奇形怪状的东西，或者干脆不存在。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  <!-- 箭杆 + 箭头 -->
+  <path
+      android:fillColor="#FFFFFFFF"
+      android:pathData="M11,3h2v8h3.5L12,16.5L7.5,11H11z" />
+  <!-- 托盘底线 -->
+  <path
+      android:fillColor="#FFFFFFFF"
+      android:pathData="M5,19.2h14v1.6H5z" />
+</vector>

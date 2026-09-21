@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  走资源的两类文案：
+
+    1. 应用名 —— 它出现在启动器、最近任务与系统设置里，由系统读取。
+    2. 长按菜单项 —— 因为 Android 的 IMenu.Add 只接受 Java 侧的 CharSequence 或**字符串资源 id**，
+       没有接收 C# string 的重载。既然必须二选一，选资源 id：不必在 C# 里包一层
+       Java.Lang.String，也顺带让这几条能被系统本地化。
+
+  界面里的其余文案都写在其所属控件的代码里（与桌面端两个工程的做法一致）。
+-->
+<resources>
+  <string name="app_name">AnimeDownloader</string>
+
+  <string name="menu_save">保存到设备</string>
+  <string name="menu_open_source">打开来源页面</string>
+  <string name="menu_copy_url">复制图片地址</string>
+</resources>
