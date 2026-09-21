@@ -134,7 +134,13 @@
                                     Background="{DynamicResource AppHairlineStrongBrush}" />
                             <Button x:Name="ZoomOutButton" Theme="{StaticResource AppIconButton}"
                                     Click="OnZoomOut" ToolTip.Tip="缩小（Ctrl+-）">
-                                <controls:FontIcon Glyph="&#xE8A2;" FontSize="14" />
+                                <!--
+                                    原来是 &#xE8A2; —— 官方名是 AttachCamera，画出来是**一台相机**。
+                                    码位存在、渲染得出来，所以覆盖检查全绿，只有把字形画出来才看得出不对。
+                                    现改用 E71F ZoomOut（放大镜带减号），与放大 E8A3 成对。
+                                    WinUI 版（main 分支）是同一处笔误，已同步修正。
+                                -->
+                                <controls:FontIcon Glyph="&#xE71F;" FontSize="14" />
                             </Button>
                             <Border MinWidth="50" Padding="4,0" VerticalAlignment="Center">
                                 <TextBlock x:Name="ZoomLabel" Text="100%"
@@ -149,15 +155,31 @@
                                     Background="{DynamicResource AppHairlineStrongBrush}" />
                             <Button x:Name="FitButton" Theme="{StaticResource AppIconButton}"
                                     Click="OnFitToScreen" ToolTip.Tip="适应屏幕（Ctrl+0）">
-                                <controls:FontIcon Glyph="&#xE7C3;" FontSize="14" />
+                                <!-- 原来是 &#xE7C3;（官方名 Page，画的是一张文档）。改用 E9A6 FitPage。 -->
+                                <controls:FontIcon Glyph="&#xE9A6;" FontSize="14" />
                             </Button>
                             <Button x:Name="ActualSizeButton" Theme="{StaticResource AppIconButton}"
                                     Click="OnActualSize" ToolTip.Tip="实际大小">
-                                <controls:FontIcon Glyph="&#xE738;" FontSize="14" />
+                                <!--
+                                    原来用 &#xE738;，但它的官方名是 Remove —— 画出来就是**一根短横线**，
+                                    与「实际大小」毫无关系。Segoe 里没有「1:1 / ActualSize」的字形
+                                    （E71E Zoom 是放大镜加号，会与放大重复），所以这里写等宽数字：
+                                    与同排的 100% 读数同族，语义零歧义，也符合「所有数字走等宽」。
+                                -->
+                                <TextBlock Text="1:1" FontFamily="{DynamicResource AppFontMono}"
+                                           FontSize="11" LetterSpacing="0.2"
+                                           VerticalAlignment="Center" />
                             </Button>
                             <Button x:Name="StretchButton" Theme="{StaticResource AppIconButton}"
                                     Click="OnStretchFill" ToolTip.Tip="拉伸填充">
-                                <controls:FontIcon Glyph="&#xE78F;" FontSize="14" />
+                                <!--
+                                    原来是 &#xE78F; —— 那个码位在 Segoe Fluent Icons、Segoe MDL2 Assets
+                                    以及所有公开对照表里都**不存在**（E78D/E78E/E78F 是空档，E78C 与
+                                    E790 才有字形），所以这个按钮一直是空白的。现改用 E799 AspectRatio：
+                                    它在两套 Segoe 与内置字体里都有字形，语义也正是「改宽高比铺满」。
+                                    WinUI 版（main 分支）有同样的笔误，已同步修正。
+                                -->
+                                <controls:FontIcon Glyph="&#xE799;" FontSize="14" />
                             </Button>
                             <Border Width="1" Height="18" Margin="7,0" VerticalAlignment="Center"
                                     Background="{DynamicResource AppHairlineStrongBrush}" />

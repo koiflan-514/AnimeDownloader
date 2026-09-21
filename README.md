@@ -21,6 +21,7 @@
 - [分支说明](#分支说明)
 - [项目简介](#项目简介)
 - [依赖与运行环境](#依赖与运行环境)
+- [Linux 适配度](#linux-适配度)
 - [构建与启动](#构建与启动)
 - [项目结构](#项目结构)
 - [亮点](#亮点)
@@ -85,7 +86,8 @@ XAML、控件、窗口外壳、平台服务。业务逻辑（图源协议、代�
 
 > 目标框架是平台中立的，Windows 专属能力（读注册表取系统强调色色阶、DWM 标题栏着色）
 > 都收敛在 `Platform/` 下并用 `OperatingSystem.IsWindows()` 分支，非 Windows 上有回退实现。
-> **但本项目只在 Windows 10/11 x64 上做过实测**，其他平台属于「能编译、未验证」。
+> **主力验证平台是 Windows 10/11 x64；Linux 侧已在 WSL2 的 Ubuntu 与 Fedora 上实测可用**
+> （见 [Linux 适配度](#linux-适配度)），macOS 与真机 Linux 仍属「能编译、未验证」。
 
 ---
 
@@ -95,9 +97,9 @@ XAML、控件、窗口外壳、平台服务。业务逻辑（图源协议、代�
 
 | 项 | 要求 | 说明 |
 | --- | --- | --- |
-| 操作系统 | Windows 10 1809+ / Windows 11，**x64** | 仅在 Windows x64 实测 |
+| 操作系统 | Windows 10 1809+ / Windows 11，**x64**；Linux x64 | Windows 侧做过逐页验收；Linux 侧已在 WSL2 的 Ubuntu / Fedora 上实测（见 [Linux 适配度](#linux-适配度)） |
 | .NET 运行时 | **.NET 10 Runtime**（`Microsoft.NETCore.App` 10.0） | 构建产物是框架依赖部署（`runtimeconfig.json` 只声明 `Microsoft.NETCore.App`）。**不需要 Windows Desktop Runtime，也不需要 Windows App SDK** —— 这是与 `main` 分支在部署上最大的差别 |
-| 字体 | 无强制要求 | 界面数字走等宽字体，优先 `Cascadia Mono`，未安装时回退 `Consolas` → `Microsoft YaHei UI` |
+| 字体 | 无强制要求 | 界面数字走等宽字体，优先 `Cascadia Mono`，未安装时回退 `Consolas` → `Microsoft YaHei UI`。Windows 上这几个通常都在；Linux 上由 fontconfig 代换（中文落到 `Noto Sans CJK`，不会缺字）。**图标字形不依赖系统字体** —— 已把等码位的开源图标字体打进程序集，见 [Linux 适配度](#linux-适配度) |
 
 ### 构建环境
 
@@ -119,6 +121,143 @@ XAML、控件、窗口外壳、平台服务。业务逻辑（图源协议、代�
 > `Avalonia.Diagnostics`（F12 调试面板）在 12.1.2 这一档 **nuget 上没有发布对应包**，
 > 引入会让整个 restore 直接失败（NU1102）。本项目也不需要它 —— 验证走的是
 > 「跑起来 + 截图 + 像素探针」那条路，不依赖 DevTools。
+
+---
+
+## Linux 适配度
+
+目标框架是平台中立的 `net10.0`，Core 层零 UI 依赖，Windows 专属能力（系统强调色、DWM 标题栏）
+都收敛在 `Platform/` 下并带 `OperatingSystem.IsWindows()` 回退分支 —— 因此**代码是按可跨平台写的**。
+
+**当前实测结论：WSL2 上的两个发行版都能完整跑通。** 原生构建 0 警告 0 错误、
+81/81 单元测试通过、GUI 窗口真实出现在 Windows 桌面、启动零输出。差别只剩「开箱即用程度」：
+Ubuntu 把系统库补齐后**不需要任何变通**；Fedora 至今仍缺 `libICE` / `libSM`，得自己补上才能起窗口。
+
+下面每一条都是实测（2026-09-21），不是推测。实测环境：WSL `2.7.12.0` / WSLg `1.0.73.2` /
+内核 `6.18.33.2-microsoft-standard-WSL2`，两个发行版均为 **x86_64**。
+
+### 发行版适配状态
+
+| 发行版 | 版本 | 适配状态 | 实测到哪一步 |
+| --- | --- | --- | --- |
+| **Ubuntu** | 26.04.1 LTS（Resolute Raccoon） | **✅ 全程通过，无需变通** | 系统库齐备（`libicu78` / `libice6` / `libsm6` / `fontconfig` / 全套 X11 / 中文字体）后，构建 0 警告 0 错误、测试 81/81、窗口正常出现 |
+| **Fedora Linux** | 44（WSL） | **✅ 全程通过（只差 2 个库）** | 只缺 `libICE.so.6` / `libSM.so.6`，自备这两个 `.so` 后同样构建 0 警告 0 错误、测试 81/81、窗口正常出现 |
+
+> 两者的共同起点是：**WSL 镜像都不预装 .NET**。本项目在两边的实测用的是发行版里的 .NET 10 SDK
+> （Ubuntu `10.0.112` / Fedora `10.0.111`）。Fedora 至今未提供 `libICE` / `libSM`
+> （`ldconfig -p` 里查不到），这是两个发行版目前唯一的差异。
+
+### 已验证的功能
+
+| 项 | Ubuntu 26.04.1 | Fedora Linux 44 |
+| --- | --- | --- |
+| 原生构建 `dotnet build AnimeDownloader.slnx -c Debug` | **0 警告 0 错误** | **0 警告 0 错误** |
+| 原生单元测试 `dotnet test` | **通过 81 / 失败 0** | **通过 81 / 失败 0** |
+| GUI 窗口 | `AnimeDownloader (Ubuntu)` 出现在 Windows 桌面 | `AnimeDownloader (FedoraLinux-44)` 出现在 Windows 桌面 |
+| 启动输出 | stdout / stderr **各 0 字节**（无异常） | stdout / stderr **各 0 字节**（无异常） |
+| 中文字体覆盖 | 30 个 CJK 字体族，`fc-match ":charset=4e2d"` 命中 `Noto Sans CJK` | 27 个 CJK 字体族，同样命中 `Noto Sans CJK` |
+| 交叉发布 | Windows 侧 `dotnet publish -r linux-x64 --self-contained` 成功，产物自带 .NET 运行时与 Skia / HarfBuzz 原生库 | 同左（目标发行版连 .NET 都不用装） |
+| 图标字形 | 20/20 命中内置图标字体（解析为 `Symbols`） | 20/20 命中 |
+
+窗口都由 WSLg 的 `msrdc.exe` 承载，标题带发行版后缀 —— 两个窗口可以同时开着。
+Core 与测试**原样复用**：81 个用例在两个发行版上都是 81/81，没有为 Linux 改过一行业务代码。
+
+**没验证的也要说清楚**：三页（画廊 / 灯箱 / 设置）的实际交互、图片加载与下载、批量下载、
+代理隧道，**都只在 Windows 上做过逐页验收**；Linux 侧验证到「构建 + 测试 + 窗口成功创建并呈现」。
+字体覆盖是用 `fc-match` 查字形（确认不会缺字），但没有做逐像素的界面比对。
+
+### 图标：靠内置字体兜底
+
+界面上的二十多个图标**全部**是 `Segoe Fluent Icons` 的私用区（PUA）字形，而该字体是
+**Windows 专有**的。在 Linux / macOS 上它不存在，fontconfig 会把这条字族代换成
+`Noto Sans` —— 而 `Noto Sans` 不含 PUA 字形，于是**整组图标一起变空白**。
+这一条特别难查：字符有内容、占位也正确，光看布局几乎发现不了。
+
+修法是往程序集里打一份**码位与 Segoe 一致**的开源替代字体（Uno FluentUI Assets，
+Apache-2.0），字族链改为 `内置字体 → Segoe Fluent Icons → Segoe MDL2 Assets`：
+
+| 字族写法 | 解析结果 | 图标命中 |
+| --- | --- | --- |
+| 修复前：只写 `Segoe Fluent Icons, Segoe MDL2 Assets` | `Noto Sans` | **0 / 20** |
+| 现在：链首内置字体 | 内置的 `Symbols` | **19 / 19** |
+
+这张表来自实测，而且**不是靠截图** —— 是直接问 Avalonia 的字体解析结果
+（`FontManager` → `GlyphTypeface.CharacterToGlyphMap`），两个发行版上都是全命中，
+对照组（只写 Segoe）则是 `0/20`。同一份数据同时证明了「测试有区分力」与「修复生效」，
+也正因为对照组能稳定复现出 `0/20`，这条结论才算落地。
+
+> 内置字体覆盖 **1410** 个码位，`Segoe Fluent Icons` 是 **1999** 个 —— **它是子集，不是超集**。
+> 实测 `E9A4` 在 Segoe 里有、在内置字体里是空的。新增图标时必须逐码位实测，不能照抄对照表。
+
+### 顺手清掉的四个码位笔误（与 Linux 无关，Windows 上同样错）
+
+排查「图标空白」时把全部在用码位对着官方名字表过了一遍，发现四处**码位存在、字形也渲染得出来、
+但画的根本不是那个意思**的笔误 —— 这类问题「字形有没有」的检查全绿，只有把字形画出来才看得见：
+
+| 用途 | 原来是 | 官方名 → 实际画的是 | 现在改用 |
+| --- | --- | --- | --- |
+| 拉伸填充 | `E78F` | **不存在** → 空白（Windows 上也空白） | `E799` AspectRatio |
+| 缩小（Ctrl+-） | `E8A2` | **AttachCamera** → 一台相机 | `E71F` ZoomOut |
+| 适应屏幕（Ctrl+0） | `E7C3` | **Page** → 一张文档 | `E9A6` FitPage |
+| 实际大小 | `E738` | **Remove** → 一根短横线 | 等宽文字 **`1:1`**（不再占码位） |
+
+> 「实际大小」没有改成别的码位，是因为 Segoe 里**没有**「1:1 / ActualSize」这个语义的字形
+> （`E71E` Zoom 是放大镜加号，会与放大重复）。改成等宽数字既零歧义，也正好符合本设计
+> 「所有数字走等宽」的既有规则 —— 与同排的 `100%` 读数同族。
+>
+> 余下 16 个码位语义都正确（`E721` Search 用在标签搜索框前缀是对的）。官方码位对照表：
+> <https://learn.microsoft.com/en-us/windows/apps/design/style/segoe-fluent-icons-font>
+
+> 内置字体是本仓库唯一的第三方二进制资产，Apache-2.0；许可原文随字体一起放在
+> `src/AnimeDownloader.App/Assets/Fonts/LICENSE-Uno-FluentUI-Assets.md`，字体文件未做任何修改。
+
+### 已知限制
+
+| 限制 | 实测现象 | 处理 |
+| --- | --- | --- |
+| **Fedora 缺 `libICE` / `libSM`** | 启动即抛 `DllNotFoundException: libICE.so.6`，栈顶在 `ICELib.IceAddConnectionWatch` —— Avalonia 的 X11 后端硬依赖这两个库 | 装 `libICE libSM`；或把两个 `.so` 放到任意目录，运行时用 `LD_LIBRARY_PATH` 指过去（本项目实测走的是后者） |
+| 缺 `libicu` | .NET 直接 `FailFast` 退出，退出码 **134**，报 `Couldn't find a valid ICU package installed on the system` | 装 `libicu`；或设 `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1`（代价是失去区域性支持） |
+| 缺 `fontconfig` | SkiaSharp 原生库加载失败 | 装 `fontconfig` |
+| 缺中文字体 | 界面字族（含 `Microsoft YaHei UI`）经 `fc-match` 全落到 `DejaVu Sans` —— 该字体**不含中文字形**，中文会显示成方框 | 装 `fonts-noto-cjk` / `google-noto-sans-cjk-fonts` |
+| 无 GPU 加速 | 窗口标题**有时**被 WSLg 加上 `[WARN:COPY MODE]` 前缀（RDP 呈现层退到软件渲染「拷贝模式」） | 呈现层行为，不影响功能；时有时无 |
+| Fedora 的 `systemd` 用户会话 | **冷启动**进入时提示 `Failed to start the systemd user session for 'kokoro'` | 与该镜像的 systemd 配置有关，本应用不依赖它，命令与 GUI 都不受影响 |
+| 非 Windows 回退分支未做像素级验收 | 系统强调色改由 `IPlatformSettings` 派生、DWM 标题栏着色被跳过 | 功能可用、界面能起，但未逐像素比对 |
+
+### 在 WSL2 上跑起来
+
+两条路都实测过：**A) 在发行版内原生构建**（推荐 —— 顺带能把那 81 个测试跑掉）；
+**B) 在 Windows 侧交叉发布自包含产物**（目标发行版连 .NET 都不用装）。
+
+```bash
+# A) 发行版内原生构建、测试、启动（两发行版通用；仓库在 /mnt/<盘符>/ 下即可）
+cd /mnt/d/Downloder/AnimeDownloader-Avalonia
+dotnet build AnimeDownloader.slnx -c Debug          # 期望：0 警告 0 错误
+dotnet test  AnimeDownloader.slnx -c Debug          # 期望：通过 81 / 失败 0
+src/AnimeDownloader.App/bin/x64/Debug/net10.0/AnimeDownloader
+
+# B) Windows 侧交叉发布（-r linux-x64，产物自带运行时）
+dotnet publish src/AnimeDownloader.App/AnimeDownloader.App.csproj \
+  -c Release -r linux-x64 --self-contained true -o artifacts/linux-x64
+```
+
+系统库是唯一的额外步骤（`DISPLAY` 由 WSLg 提供，不需要配置）：
+
+```bash
+# Ubuntu / Debian 系：镜像默认四样都缺，一次补齐
+sudo apt install -y libicu78 libice6 libsm6 fontconfig fonts-noto-cjk
+
+# Fedora 系：当前只差 libICE / libSM（libicu、fontconfig、libX11、中文字体都已齐）
+sudo dnf install -y libICE libSM
+# 换新镜像时的完整清单：
+#   sudo dnf install -y libicu fontconfig libICE libSM \
+#     libX11 libXcursor libXrandr libXi libXext google-noto-sans-cjk-fonts
+
+# 真装不上 libICE / libSM 时的变通：把这两个 .so 放好，运行时指过去
+LD_LIBRARY_PATH=$HOME/extra-libs ./AnimeDownloader
+```
+
+> 若系统装不了 `libicu`，可以退化运行：`DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 ./AnimeDownloader`。
+> 这条路实测可行，但会失去区域性支持，只建议用于验证界面，不作为日常使用方式。
 
 ---
 
@@ -182,7 +321,8 @@ AnimeDownloader/                       # 仓库根（@ avalonia 分支）
 │       │                              # TileWrapPanel、ConfirmDialog、InfoBar、ProgressRing、FontIcon
 │       ├── Platform/                  # WindowChrome（标题栏 / 最小尺寸 / 全屏）
 │       │                              # WindowsColorScheme（强调色色阶 + 墨色自动判定）
-│       └── Styles/                    # Tokens / FluentOverrides / AppStyles / AppElementStyles
+│       ├── Styles/                    # Tokens / FluentOverrides / AppStyles / AppElementStyles
+│       └── Assets/Fonts/              # 内置图标字体（Apache-2.0）+ 许可原文
 ├── design/
 │   ├── DESIGN.md                      # 暗房设计语言规范（色彩 / 字体 / 布局 / 组件 / 动效）
 │   └── preview.html                   # 可交互样张（浏览器打开）
@@ -467,3 +607,8 @@ UI Automation 按 `AutomationId` 遍历元素树 + 逐页截图 + 像素采样�
 ## 许可
 
 GPL-3.0-or-later（与参考项目一致）。
+
+仓库里另有一份**第三方二进制资产**：`src/AnimeDownloader.App/Assets/Fonts/uno-fluentui-assets.ttf`
+（Uno FluentUI Assets，Copyright © nventive，**Apache-2.0**）。它是为了让非 Windows 平台也能显示
+图标字形而内置的，字体文件**未做任何修改**；许可原文见同目录下的
+`LICENSE-Uno-FluentUI-Assets.md`（随程序集一起分发以满足 Apache-2.0 第 4 条）。

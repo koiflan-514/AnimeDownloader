@@ -36,11 +36,21 @@
     <!-- Mono：所有数字与元数据 —— 本设计的签名细节 -->
     <FontFamily x:Key="AppFontMono">Cascadia Mono, Consolas, Microsoft YaHei UI</FontFamily>
     <!--
-        Icon：WinUI 的 FontIcon 用的就是 Segoe Fluent Icons。Avalonia 没有 FontIcon 控件，
-        这里保留同一个字族，让它逐字形一致（.ico 之外的图标全是字形而不是矢量图，
-        「布局与视觉一致」因此在像素层面成立）。
+        Icon：WinUI 的 FontIcon 用的是 Segoe Fluent Icons —— 而它是 **Windows 专有字体**，
+        Linux / macOS 上根本不存在（fontconfig 会代换成 Noto Sans，而 Noto Sans 不含
+        PUA 字形），于是二十多个图标会**整组变空白**。所以这里把链首交给**内置的
+        开源等码位字体**（Uno FluentUI Assets，Apache-2.0，见 Assets/Fonts/ 与 csproj 说明），
+        后面才排 Windows 的原生字体：
+
+          1. 内置字体 —— 各平台都在，保证 Linux / macOS 有字形，且与 Windows 渲染一致；
+          2. Segoe Fluent Icons / Segoe MDL2 Assets —— 万一内置字体缺某个字形时兜底
+             （Windows 上才有意义）。
+
+        写这条 URI 时注意两点：`avares://` 后面要跟 **AssemblyName（AnimeDownloader）**
+        而不是命名空间；字族名要用字体内部的名字 **Symbols**（上游就是这么命名的，
+        为的是两份字体能原地互换）。
     -->
-    <FontFamily x:Key="AppFontIcon">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+    <FontFamily x:Key="AppFontIcon">avares://AnimeDownloader/Assets/Fonts/uno-fluentui-assets.ttf#Symbols, Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
     <!-- ==================== 尺度令牌 ==================== -->
     <CornerRadius x:Key="ControlCornerRadius">7</CornerRadius>

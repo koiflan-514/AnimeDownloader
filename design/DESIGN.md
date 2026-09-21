@@ -110,15 +110,57 @@
 
 ## 3. 字体体系
 
-三族，各司其职，全部是 Windows 自带或随系统分发的字体，**零外部依赖**：
+四族，各司其职。文本三族全部是 Windows 自带或随系统分发的字体；**图标一族是唯一的外部依赖**（随程序集分发，见下）：
 
 | 令牌 | 字族 | 用于 |
 |---|---|---|
 | `AppFontDisplay` | `Segoe UI Variable Display, Segoe UI, Microsoft YaHei UI` | 页面标题、展板标题 |
 | `AppFontText` | `Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI` | 正文、控件、按钮 |
 | `AppFontMono` | `Cascadia Mono, Consolas, Microsoft YaHei UI` | **所有数字与元数据** |
+| `AppFontIcon` | **内置** `uno-fluentui-assets.ttf#Symbols` → `Segoe Fluent Icons` → `Segoe MDL2 Assets` | 全部图标字形 |
 
 `ContentControlThemeFontFamily` 也被指向 Text 字面，让原生控件的默认文本一并归队。
+
+### 图标字体：为什么要打破「零外部依赖」
+
+界面上的二十多个图标**全部**是 `Segoe Fluent Icons` 私用区（PUA）的字形（`E711` / `E713` / `E91B` …），
+而该字体是 **Windows 专有**的。非 Windows 平台上它不存在，fontconfig / FontManager 会把这条字族
+代换成 `Noto Sans` —— 而 `Noto Sans` 不含 PUA 字形，于是**整组图标一起变空白**。
+
+这一条特别难查：字符有内容、占位也正确，布局毫无异常，光看界面几乎发现不了。判定方法是直接问
+字体解析（`FontManager` → `GlyphTypeface.CharacterToGlyphMap.TryGetGlyph`），而不是截图。
+
+修法是往程序集里打一份**码位与 Segoe 一致**的开源替代字体 —— Uno Platform 的
+`uno-fluentui-assets.ttf`（Apache-2.0，专为「直接替换 Segoe MDL2 / Fluent Icons」而做），
+并把它排在字族链首位。字形仍是**字体字形**而不是手抄矢量路径：这样图标与 WinUI 版同源，
+字重随字号缩放的行为也不变。
+
+写这条 URI 有两个坑：`avares://` 后面要跟 **AssemblyName（`AnimeDownloader`）**而不是命名空间；
+字族内部名是 **`Symbols`**（上游故意这么命名，为的是两份字体能原地互换），不是「Uno Fluent Icons」。
+
+> **选码位前必须先确认字形存在。** 内置字体覆盖的是 Segoe 的同一套码位，但**不是超集**：
+> 实测 `E9A4`（TextBulletListSquare）在 Segoe 里有、在内置字体里**是空的**。新增图标时先按
+> 上法查一次解析结果，再看渲染图确认语义 —— 不要照抄「某个对照表里的名字」就填。
+
+### 图标码位必须对着官方名字表核（四个真实笔误）
+
+PUA 码位**本身不带语义** —— 写错一个数字，不报错、不缺字形、布局也正常，只是画的不是那个东西。
+把全部在用码位逐个对照官方表后查出四处，两个分支同步修正：
+
+| 用途 | 原码位 | 官方名 | 实际画的是 | 现用 |
+|---|---|---|---|---|
+| 拉伸填充 | `E78F` | **不存在** | 空白（Windows 上也空白） | `E799` AspectRatio |
+| 缩小（Ctrl+-） | `E8A2` | AttachCamera | 一台相机 | `E71F` ZoomOut |
+| 适应屏幕（Ctrl+0） | `E7C3` | Page | 一张文档 | `E9A6` FitPage |
+| 实际大小 | `E738` | Remove | 一根短横线 | 等宽文字 **`1:1`**（不占码位） |
+
+两条纪律：① **只看「有没有字形」不够**，必须把字形渲染出来看语义 —— 后三处「字形存在」的检查全绿，
+正是靠渲染图才发现的；② 「实际大小」没有再挑码位，因为 Segoe 里**没有**该语义的字形
+（`E71E` Zoom 是放大镜加号，会与放大重复），改用等宽数字零歧义，也正合「所有数字走等宽」。
+
+> `Segoe Fluent Icons` 与 `Segoe MDL2 Assets` 有少量码位不重合，以官方表为准：
+> <https://learn.microsoft.com/en-us/windows/apps/design/style/segoe-fluent-icons-font>。
+> 字体文件的 `post` 表是 3.0 格式，**从文件里读不到字形名**，别在这上面浪费时间。
 
 ### 字阶
 

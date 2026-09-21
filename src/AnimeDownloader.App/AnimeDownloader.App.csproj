@@ -51,4 +51,20 @@
     <Content Include="..\..\icons\AnimeDownloader.png" Link="AnimeDownloader.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!--
+    内置图标字体（Apache-2.0，许可原文见 Assets/Fonts/LICENSE-Uno-FluentUI-Assets.md）。
+
+    界面上的图标**全部**是 Segoe Fluent Icons 私用区（PUA）的字形，而该字体是 Windows
+    专有的：Linux / macOS 上没有它，fontconfig 会把这条字族代换成 Noto Sans ——
+    于是 20 个图标**全部渲染成空白**。特别难查的一点是：字符有内容、占位也正确，
+    光看布局几乎发现不了，只有把字形解析出来才看得出来。
+
+    因此把一份**码位与 Segoe 一致**的开源替代字体（Uno FluentUI Assets，专为
+    「直接替换 Segoe MDL2 / Fluent Icons」而做）打进程序集，作为字族链的第一顺位。
+    字体文件**未做任何修改**，随附上游许可证原文以满足 Apache-2.0 第 4 条。
+  -->
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\Fonts\uno-fluentui-assets.ttf" />
+  </ItemGroup>
+
 </Project>
