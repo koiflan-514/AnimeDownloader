@@ -16,6 +16,7 @@
 
 ## 目录
 
+- [分支说明](#分支说明)
 - [亮点](#亮点)
 - [界面](#界面)
 - [功能](#功能)
@@ -29,6 +30,37 @@
 - [常见问题](#常见问题)
 - [相关文档](#相关文档)
 - [许可](#许可)
+
+---
+
+## 分支说明
+
+本仓库用**分支**而不是子目录来承载三套平台实现 —— 三条分支共用同一份
+`AnimeDownloader.Core`（图源适配器、设置、代理探测、标签体系）与
+`AnimeDownloader.Download`（下载编排），平台差异全部收敛在各自的应用层。
+代价是**改 Core 要三边一起改**，好处是图源协议与配置格式永远只有一份。
+
+| 分支 | 形态 | 说明 |
+| --- | --- | --- |
+| `main`（当前） | WinUI 3 桌面应用 | Windows 10 1809+，原生 Mica 材质。**发布线**，标签 `v0.2.0` / `v0.4.0` 都在这条分支上 |
+| [`avalonia`](https://github.com/koiflan-514/AnimeDownloader/tree/avalonia) | Avalonia 桌面应用 | 同一套界面的跨平台重写，Windows 与 Linux 都能跑 |
+| [`android`](https://github.com/koiflan-514/AnimeDownloader/tree/android) | .NET for Android | 手机端，触控优先的独立版式；配置文件与桌面版同格式 |
+
+只取其中一条分支：
+
+```bash
+git clone -b avalonia https://github.com/koiflan-514/AnimeDownloader.git
+```
+
+看两个版本到底差在哪（差异集中在应用层，Core 是一致的）：
+
+```bash
+git diff main..avalonia -- src/AnimeDownloader.App
+git diff main..android  -- src/AnimeDownloader.App
+```
+
+每条分支都有自己的 README，写了该平台的构建、部署与排错。本文以下内容全部针对
+`main`（WinUI 3 桌面版）。
 
 ---
 
@@ -347,6 +379,7 @@ Gelbooru 已停用匿名 API，需要在设置页填写 `user_id` 与 `api_key`�
 - [`design/DESIGN.md`](design/DESIGN.md) —— 暗房设计语言、色彩 / 字体 / 布局规范、组件与动效
 - [`design/preview.html`](design/preview.html) —— 1:1 可交互样张
 - [`docs/RELEASE-v0.4.0.md`](docs/RELEASE-v0.4.0.md) —— v0.4.0 发布说明
+- [`avalonia`](https://github.com/koiflan-514/AnimeDownloader/tree/avalonia) / [`android`](https://github.com/koiflan-514/AnimeDownloader/tree/android) —— 另两条分支各自的 README（跨平台桌面版 / 手机版）
 
 ---
 
